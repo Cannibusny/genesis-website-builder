@@ -1,7 +1,7 @@
 {
   "name": "genesis-website-builder",
-  "version": "2.1.0",
-  "description": "AI-Powered Website Builder with multi-variant generation, SEO scoring, analytics injection, cannabis compliance, password gate, and per-IP rate limiting",
+  "version": "2.2.0",
+  "description": "AI-Powered Website Builder with named variants (Professional/Modern/Premium), industry-specific design rules, AI suggestions, AI refinement, Hotjar injection, exit-intent + A/B test + chatbot framework in generated sites, SEO scoring, cannabis compliance, password gate, and per-IP rate limiting",
   "type": "module",
   "engines": {
     "node": ">=20"

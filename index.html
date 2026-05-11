@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GENESIS Website Builder · v2</title>
-<meta name="description" content="AI-powered website builder by GENESIS. Generate production-grade marketing sites with theme presets, analytics, multi-variant A/B output, and built-in SEO scoring." />
+<title>GENESIS Website Builder · v2.2</title>
+<meta name="description" content="AI-powered website builder by GENESIS. Generate production-grade marketing sites with named variants (Professional / Modern / Premium), industry-specific design rules, AI refinement, and built-in SEO scoring." />
 <style>
   :root {
     --bg: #07080c;
@@ -303,6 +303,68 @@
   .rec-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .rec { font-size: 12.5px; line-height: 1.45; color: #fde68a; padding: 8px 10px; border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; background: rgba(245,158,11,0.06); }
 
+  /* ----- AI suggestions bubble (below description) ----- */
+  .suggest-box {
+    margin-top: 8px;
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    background: rgba(34, 211, 238, 0.06);
+    color: #d3f4ff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: none;
+  }
+  .suggest-box.show { display: block; }
+  .suggest-box .head {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 600; color: var(--accent-2); margin-bottom: 6px;
+  }
+  .suggest-box ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .suggest-box.loading .head::after { content: "…"; }
+
+  /* ----- Refinement panel ----- */
+  .refine-panel {
+    margin-top: 14px;
+    border: 1px solid var(--border-2);
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    background: rgba(255, 255, 255, 0.015);
+    display: none;
+  }
+  .refine-panel.show { display: block; }
+  .refine-panel h4 {
+    margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  }
+  .refine-panel .lead {
+    font-size: 12.5px; color: var(--text); margin: 0 0 10px;
+  }
+  .refine-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; margin-bottom: 8px;
+  }
+  @media (max-width: 1200px) { .refine-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .refine-grid { grid-template-columns: 1fr; } }
+  .refine-col h5 {
+    margin: 6px 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted);
+  }
+  .refine-grid label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text); text-transform: none; letter-spacing: normal;
+    padding: 3px 0; cursor: pointer;
+  }
+  .refine-grid input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+  .refine-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .refine-actions input.custom {
+    flex: 1 1 240px; min-width: 200px;
+    background: #0d1018; border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 12.5px;
+  }
+  .refine-actions .ctl.apply {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white; border: 0; font-weight: 600;
+  }
+  .refine-actions .ctl.apply:hover { opacity: 0.95; }
+
   .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 18px 0 8px; }
 
   /* ----- Footer attribution ----- */
@@ -321,7 +383,7 @@
 <header class="app-header">
   <div class="brand">
     <div class="logo"></div>
-    <div class="name">GENESIS<span>·</span>Website Builder<span class="pill">v2</span></div>
+    <div class="name">GENESIS<span>·</span>Website Builder<span class="pill">v2.2</span></div>
   </div>
   <div class="health" id="health">
     <span class="dot" id="healthDot"></span>
@@ -369,6 +431,10 @@
       <div class="field">
         <label for="description">Description</label>
         <textarea id="description" name="description" placeholder="What makes the business unique? Audience, vibe, signature offerings…" required></textarea>
+        <div id="suggestBox" class="suggest-box" aria-live="polite">
+          <div class="head">AI Suggestions</div>
+          <ul id="suggestList"></ul>
+        </div>
       </div>
 
       <details class="section" id="themeSection" open>
@@ -400,14 +466,33 @@
       </details>
 
       <details class="section" id="variantSection">
-        <summary>A/B Variants</summary>
+        <summary>Design Variants</summary>
         <div class="body">
           <div class="variant-toggle" id="variantToggle" role="radiogroup" aria-label="Variant count">
             <div class="vt is-selected" data-count="1">1 variant</div>
             <div class="vt" data-count="2">2 variants</div>
             <div class="vt" data-count="3">3 variants</div>
           </div>
-          <p class="hint">Multiple variants generate distinct creative directions (Bold/Editorial, Minimal/Trust, Story-driven). Use the tabs in the preview panel to compare.</p>
+          <p class="hint">Multiple variants generate distinct creative directions — <strong>Professional</strong> (trust, navy + serif), <strong>Modern</strong> (bold, high contrast), <strong>Premium</strong> (black + gold luxury). Compare them in the preview tabs.</p>
+        </div>
+      </details>
+
+      <details class="section" id="conversionSection">
+        <summary>Conversion Tools (in generated sites)</summary>
+        <div class="body">
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="exitIntent" style="width:auto;" checked />
+            <span>Exit-intent email capture popup</span>
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="abHeadline" style="width:auto;" />
+            <span>Built-in A/B headline test (random per visitor, localStorage)</span>
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="chatbot" style="width:auto;" />
+            <span>Chatbot framework (partner adds Anthropic key to activate)</span>
+          </label>
+          <p class="hint">These are added to the generated site, not the builder app.</p>
         </div>
       </details>
 
@@ -421,6 +506,10 @@
           <div class="field">
             <label for="metaPixel">Meta Pixel ID</label>
             <input id="metaPixel" name="metaPixel" placeholder="1234567890123456" inputmode="numeric" pattern="\d{6,}" />
+          </div>
+          <div class="field">
+            <label for="hotjar">Hotjar Site ID</label>
+            <input id="hotjar" name="hotjar" placeholder="1234567" inputmode="numeric" pattern="\d{6,}" />
           </div>
           <p class="hint">Provided IDs are injected into every generated site automatically. Leave blank to skip.</p>
         </div>
@@ -504,6 +593,38 @@
         <div class="rec-list" id="recList">
           <div class="hint">Recommendations will appear here.</div>
         </div>
+
+        <div class="refine-panel" id="refinePanel">
+          <h4>AI Refinement</h4>
+          <p class="lead">Tweak the active variant without starting over. Pick adjustments, then Apply.</p>
+          <div class="refine-grid">
+            <div class="refine-col">
+              <h5>Tone</h5>
+              <label><input type="checkbox" data-refine="toneProfessional"/> More professional</label>
+              <label><input type="checkbox" data-refine="toneCasual"/> More casual / friendly</label>
+              <label><input type="checkbox" data-refine="toneUrgent"/> More urgent / action</label>
+              <label><input type="checkbox" data-refine="toneLuxury"/> More luxurious</label>
+            </div>
+            <div class="refine-col">
+              <h5>Copy</h5>
+              <label><input type="checkbox" data-refine="copyShorten"/> Shorten / punchier</label>
+              <label><input type="checkbox" data-refine="copyExpand"/> Expand with detail</label>
+              <label><input type="checkbox" data-refine="copyLocalSEO"/> Add local SEO depth</label>
+              <label><input type="checkbox" data-refine="copyEmphasizeOffer"/> Emphasize main offer</label>
+            </div>
+            <div class="refine-col">
+              <h5>Design</h5>
+              <label><input type="checkbox" data-refine="designBolder"/> Bolder colors</label>
+              <label><input type="checkbox" data-refine="designSofter"/> Softer / elegant</label>
+              <label><input type="checkbox" data-refine="designMoreWhitespace"/> More whitespace</label>
+              <label><input type="checkbox" data-refine="designRicher"/> Richer visuals</label>
+            </div>
+          </div>
+          <div class="refine-actions">
+            <input class="custom" id="customRefine" placeholder="Custom instruction (optional)…" maxlength="600" />
+            <button class="ctl apply" id="applyRefineBtn" type="button">Apply Refinements</button>
+          </div>
+        </div>
       </aside>
     </div>
   </section>
@@ -535,12 +656,23 @@
   const businessTypeSelect = document.getElementById('businessType');
   const complianceSection = document.getElementById('complianceSection');
   const ageGate = document.getElementById('ageGate');
+  const description = document.getElementById('description');
+  const suggestBox = document.getElementById('suggestBox');
+  const suggestList = document.getElementById('suggestList');
+  const refinePanel = document.getElementById('refinePanel');
+  const applyRefineBtn = document.getElementById('applyRefineBtn');
+  const customRefine = document.getElementById('customRefine');
+  const exitIntent = document.getElementById('exitIntent');
+  const abHeadline = document.getElementById('abHeadline');
+  const chatbot = document.getElementById('chatbot');
+  const hotjar = document.getElementById('hotjar');
 
   let state = {
     variants: [],
     activeVariant: 0,
     selectedTheme: 'obsidian',
     selectedCount: 1,
+    lastPayload: null,
   };
 
   // ---- Health check ----
@@ -623,13 +755,17 @@
   }
 
   // ---- Variant tabs ----
+  function variantLabel(v, i) {
+    if (v && v.profile && v.profile.label) return v.profile.label;
+    return String.fromCharCode(65 + i);
+  }
   function renderVariantTabs() {
     if (state.variants.length <= 1) {
       variantTabs.innerHTML = '';
       return;
     }
     variantTabs.innerHTML = state.variants
-      .map((v, i) => `<div class="tab ${i === state.activeVariant ? 'is-active' : ''}" data-i="${i}">${String.fromCharCode(65 + i)}<span class="score-pill">${v.seo?.score ?? '—'}</span></div>`)
+      .map((v, i) => `<div class="tab ${i === state.activeVariant ? 'is-active' : ''}" data-i="${i}" title="${(v.profile && v.profile.description) ? v.profile.description.replace(/"/g,'&quot;') : ''}">${variantLabel(v, i)}<span class="score-pill">${v.seo?.score ?? '—'}</span></div>`)
       .join('');
   }
   variantTabs.addEventListener('click', (e) => {
@@ -647,7 +783,106 @@
     preview.srcdoc = v.html;
     renderSeo(v.seo);
     renderVariantTabs();
+    refinePanel.classList.add('show');
   }
+
+  // ---- AI suggestions (debounced on description input) ----
+  let suggestTimer = null;
+  let lastSuggestKey = '';
+  description.addEventListener('input', () => {
+    clearTimeout(suggestTimer);
+    const text = description.value.trim();
+    if (text.length < 50) {
+      suggestBox.classList.remove('show');
+      return;
+    }
+    suggestTimer = setTimeout(fetchSuggestions, 1100);
+  });
+  async function fetchSuggestions() {
+    const text = description.value.trim();
+    const key = (businessTypeSelect.value || '') + '|' + text;
+    if (key === lastSuggestKey || text.length < 50) return;
+    lastSuggestKey = key;
+    suggestBox.classList.add('show', 'loading');
+    suggestList.innerHTML = '<li>Analyzing…</li>';
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: text,
+          businessType: businessTypeSelect.value || '',
+          location: document.getElementById('location').value.trim(),
+        }),
+      });
+      if (res.status === 401) { suggestBox.classList.remove('show'); return; }
+      const data = await res.json().catch(() => ({}));
+      const items = (data.suggestions || []).slice(0, 3);
+      if (!items.length) {
+        suggestBox.classList.remove('show');
+        return;
+      }
+      suggestList.innerHTML = items.map(s => `<li>${escapeHtml(s)}</li>`).join('');
+    } catch {
+      suggestBox.classList.remove('show');
+    } finally {
+      suggestBox.classList.remove('loading');
+    }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+  }
+
+  // ---- AI Refinement (post-generation) ----
+  applyRefineBtn.addEventListener('click', async () => {
+    const v = state.variants[state.activeVariant];
+    if (!v || !state.lastPayload) return;
+    const refinements = Array.from(refinePanel.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(cb => cb.dataset.refine);
+    const customInstruction = customRefine.value.trim();
+    if (!refinements.length && !customInstruction) {
+      showError('Pick at least one refinement, or write a custom instruction.');
+      return;
+    }
+    clearError();
+    applyRefineBtn.disabled = true;
+    loading.classList.add('show');
+    loadStatus.textContent = 'Applying refinements…';
+    try {
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...state.lastPayload,
+          sourceHtml: v.html,
+          refinements,
+          customInstruction,
+          variantHint: v.variantHint || null,
+        }),
+      });
+      if (res.status === 401) { window.location.replace('/'); return; }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const retry = res.headers.get('Retry-After');
+        const mins = retry ? Math.ceil(parseInt(retry, 10) / 60) : null;
+        throw new Error((data.error || 'Rate limit reached.') + (mins ? ` Try again in ~${mins} min.` : ''));
+      }
+      if (!data.success) throw new Error(data.error || 'Refinement failed');
+      state.variants[state.activeVariant] = {
+        ...v,
+        html: data.html,
+        seo: data.seo,
+      };
+      activateVariant();
+      refinePanel.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      customRefine.value = '';
+    } catch (err) {
+      showError(err.message || 'Refinement failed');
+    } finally {
+      loading.classList.remove('show');
+      applyRefineBtn.disabled = false;
+    }
+  });
 
   // ---- Submit ----
   form.addEventListener('submit', async (e) => {
@@ -656,6 +891,7 @@
 
     const ga4 = document.getElementById('ga4').value.trim();
     const metaPixel = document.getElementById('metaPixel').value.trim();
+    const hotjarId = hotjar.value.trim();
     const minAge = parseInt(document.getElementById('minAge').value, 10) || 21;
     const complianceState = document.getElementById('complianceState').value.trim();
     const licenseNumber = document.getElementById('licenseNumber').value.trim();
@@ -667,11 +903,17 @@
       description: document.getElementById('description').value.trim(),
       theme: state.selectedTheme,
       variantCount: state.selectedCount,
-      analytics: (ga4 || metaPixel) ? { ga4, metaPixel } : null,
+      analytics: (ga4 || metaPixel || hotjarId) ? { ga4, metaPixel, hotjar: hotjarId } : null,
       compliance: ageGate.checked
         ? { ageGate: true, minAge, state: complianceState, licenseNumber }
         : null,
+      conversion: {
+        exitIntent: exitIntent.checked,
+        abHeadline: abHeadline.checked,
+        chatbot: chatbot.checked,
+      },
     };
+    state.lastPayload = payload;
 
     generateBtn.disabled = true;
     loading.classList.add('show');
@@ -723,7 +965,8 @@
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `genesis-site-variant-${String.fromCharCode(65 + state.activeVariant)}.html`;
+    const label = (v.profile && v.profile.label ? v.profile.label.toLowerCase() : String.fromCharCode(65 + state.activeVariant).toLowerCase());
+    a.download = `genesis-site-${label}.html`;
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
