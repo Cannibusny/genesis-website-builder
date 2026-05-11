@@ -1,6 +1,9 @@
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
+import { rateLimit } from 'express-rate-limit';
 import Anthropic from '@anthropic-ai/sdk';
+import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -8,8 +11,75 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Railway / proxies — trust the first hop so req.ip resolves to the real client IP.
+app.set('trust proxy', 1);
+
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
+app.use(cookieParser());
+
+// ----- Shared password gate -----
+// Set BUILDER_PASSWORD env var to enable. If unset, the gate is OFF (open access).
+const BUILDER_PASSWORD = process.env.BUILDER_PASSWORD || '';
+const COOKIE_NAME = 'genesis_auth';
+const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function authToken(password) {
+  return crypto.createHash('sha256').update(`genesis::${password}`).digest('hex');
+}
+const VALID_TOKEN = BUILDER_PASSWORD ? authToken(BUILDER_PASSWORD) : '';
+
+function isAuthed(req) {
+  if (!BUILDER_PASSWORD) return true;
+  return req.cookies && req.cookies[COOKIE_NAME] === VALID_TOKEN;
+}
+
+// Public endpoints (no auth required): health + the login POST itself.
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    service: 'genesis-website-builder',
+    version: '2.1.0',
+    passwordGate: !!BUILDER_PASSWORD,
+  });
+});
+
+app.post('/api/login', (req, res) => {
+  if (!BUILDER_PASSWORD) {
+    return res.json({ success: true, gateEnabled: false });
+  }
+  const { password } = req.body || {};
+  if (!password || password !== BUILDER_PASSWORD) {
+    return res.status(401).json({ success: false, error: 'Incorrect password' });
+  }
+  res.cookie(COOKIE_NAME, VALID_TOKEN, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: true,
+    maxAge: COOKIE_MAX_AGE_MS,
+  });
+  res.json({ success: true });
+});
+
+app.post('/api/logout', (req, res) => {
+  res.clearCookie(COOKIE_NAME);
+  res.json({ success: true });
+});
+
+// Gate everything else (UI + APIs).
+app.use((req, res, next) => {
+  if (isAuthed(req)) return next();
+  // For API calls, respond with 401 JSON.
+  if (req.path.startsWith('/api/')) {
+    return res.status(401).json({ success: false, error: 'Authentication required', authRequired: true });
+  }
+  // For static / UI requests, serve the login page.
+  if (req.method === 'GET' || req.method === 'HEAD') {
+    res.set('Cache-Control', 'no-cache');
+    return res.sendFile(path.join(__dirname, 'login.html'));
+  }
+  return res.status(401).send('Authentication required');
+});
 
 // Cache-friendly static middleware: HTML responses are no-cache, everything else gets a long max-age.
 app.use(
@@ -23,6 +93,20 @@ app.use(
     },
   })
 );
+
+// ----- Per-IP rate limit for the expensive generate endpoint -----
+const GENERATE_LIMIT_PER_HOUR = parseInt(process.env.GENERATE_LIMIT_PER_HOUR || '5', 10);
+const generateLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: GENERATE_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Rate limit reached (${GENERATE_LIMIT_PER_HOUR} generations per hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
 
 // ----- Theme palettes (passed into the model so generated sites pick a coherent palette) -----
 const THEMES = {
@@ -363,7 +447,7 @@ Build the entire single-file HTML now.`;
 }
 
 // ----- /api/generate: supports variantCount, theme, compliance, analytics -----
-app.post('/api/generate', async (req, res) => {
+app.post('/api/generate', generateLimiter, async (req, res) => {
   try {
     const body = req.body || {};
     const {
@@ -437,10 +521,10 @@ app.post('/api/seo-score', (req, res) => {
   }
 });
 
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', service: 'genesis-website-builder', version: '2.0.0' });
-});
-
 app.listen(PORT, () => {
-  console.log(`GENESIS Website Builder v2 running on port ${PORT}`);
+  console.log(
+    `GENESIS Website Builder v2.1 running on port ${PORT} (password gate ${
+      BUILDER_PASSWORD ? 'ON' : 'OFF'
+    }, generate limit ${GENERATE_LIMIT_PER_HOUR}/hr per IP)`
+  );
 });

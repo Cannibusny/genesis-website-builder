@@ -685,7 +685,20 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      if (res.status === 401) {
+        const next = encodeURIComponent(window.location.pathname);
+        window.location.replace('/?next=' + next);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const retry = res.headers.get('Retry-After');
+        const mins = retry ? Math.ceil(parseInt(retry, 10) / 60) : null;
+        throw new Error(
+          (data.error || 'Rate limit reached.') +
+            (mins ? ` Try again in ~${mins} minute${mins === 1 ? '' : 's'}.` : '')
+        );
+      }
       if (!data.success) throw new Error(data.error || 'Generation failed');
 
       state.variants = data.variants && data.variants.length ? data.variants : [{ html: data.html, seo: data.seo }];
