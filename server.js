@@ -21,6 +21,10 @@ app.use(cookieParser());
 // ----- Shared password gate -----
 // Set BUILDER_PASSWORD env var to enable. If unset, the gate is OFF (open access).
 const BUILDER_PASSWORD = process.env.BUILDER_PASSWORD || '';
+
+// ----- Consultation intake URL (configurable; used by the after-generation CTA) -----
+const DEFAULT_CONSULTATION_URL = 'https://adgorhythms-intake.up.railway.app';
+const CONSULTATION_URL = (process.env.CONSULTATION_URL || DEFAULT_CONSULTATION_URL).trim();
 const COOKIE_NAME = 'genesis_auth';
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -39,9 +43,15 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'genesis-website-builder',
-    version: '2.1.0',
+    version: '2.3.0',
     passwordGate: !!BUILDER_PASSWORD,
   });
+});
+
+// Public endpoint: the configured consultation URL. Public so the login page or
+// unauthenticated marketing surfaces could surface the CTA without leaking secrets.
+app.get('/api/consultation-config', (req, res) => {
+  res.json({ consultationUrl: CONSULTATION_URL });
 });
 
 app.post('/api/login', (req, res) => {
@@ -94,8 +104,13 @@ app.use(
   })
 );
 
-// ----- Per-IP rate limit for the expensive generate endpoint -----
+// ----- Per-IP rate limits -----
+// Three independent limiters because the endpoints have very different cost profiles
+// and /api/suggest is auto-triggered while the user types.
 const GENERATE_LIMIT_PER_HOUR = parseInt(process.env.GENERATE_LIMIT_PER_HOUR || '5', 10);
+const SUGGEST_LIMIT_PER_HOUR = parseInt(process.env.SUGGEST_LIMIT_PER_HOUR || '40', 10);
+const REFINE_LIMIT_PER_HOUR = parseInt(process.env.REFINE_LIMIT_PER_HOUR || '15', 10);
+
 const generateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: GENERATE_LIMIT_PER_HOUR,
@@ -104,6 +119,30 @@ const generateLimiter = rateLimit({
   message: {
     success: false,
     error: `Rate limit reached (${GENERATE_LIMIT_PER_HOUR} generations per hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const suggestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: SUGGEST_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Suggestion limit reached (${SUGGEST_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const refineLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: REFINE_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Refinement limit reached (${REFINE_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
     rateLimited: true,
   },
 });
@@ -142,15 +181,112 @@ function isCannabisBusiness(businessType = '', description = '') {
   return /\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack);
 }
 
+// ----- Per-industry design rules (injected into system prompt for sharper, on-brand output) -----
+function getIndustryRules(businessType = '', description = '') {
+  const haystack = `${businessType} ${description}`.toLowerCase();
+  if (/\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack)) {
+    return `INDUSTRY: Cannabis / dispensary.
+- Palette: earth tones — deep forest green (#0f3d2e), muted gold (#c9a85b), warm cream (#f4ecd8), charcoal text.
+- Visuals: organic, botanical, premium craft vibe. Inline SVG leaf accents OK. NO consumption imagery, NO appeals to minors.
+- Sections to include: Product categories (Flower / Pre-rolls / Edibles / Vapes / Concentrates / Topicals as relevant), "Visit Us" with hours + address prominently, an Education / responsible-use section, FAQ that covers ID requirements and what to expect on first visit.
+- Tone: knowledgeable, welcoming, adult-focused. Avoid stoner clichés.
+- Trust signals: license number, state agency mention, lab-tested badges, locally sourced where applicable.`;
+  }
+  if (/\b(cafe|coffee|espresso|roastery|roaster|bakery)\b/.test(haystack)) {
+    return `INDUSTRY: Coffee shop / cafe.
+- Palette: warm browns (#3a2a1a), cream (#f5ecd9), rust orange (#c2562a) or terracotta, soft greens for accents.
+- Visuals: artisanal, cozy, community. Coffee bean / steam / cup motifs via inline SVG or emoji.
+- Sections to include: Menu (espresso / pour-over / pastries with prices), origin / sourcing story, hours + location, community / events, loyalty or rewards CTA in the hero or footer.
+- Tone: warm, neighborly, craft-forward.
+- Trust signals: locally roasted, fair-trade where applicable, neighborhood ties.`;
+  }
+  if (/\b(trading\s*card|tcg|magic|pokemon|yu-?gi-?oh|hobby\s*shop|games?\s*store)\b/.test(haystack)) {
+    return `INDUSTRY: Trading card game / hobby store.
+- Palette: bold primaries (red #d92626, royal blue #1f3fb5, gold #f7c948) on a dark canvas (#0d0f17) — gaming aesthetic. OR daylight comic-shop palette if description leans family-friendly.
+- Visuals: card-grid layouts, event/tournament photos vibe, energy and motion.
+- Sections to include: Featured singles / sealed product grid, tournament & league calendar (use plausible weekly events), Buy / Sell / Trade explainer, community / Discord-style CTA, FAQ on grading and pricing.
+- Tone: enthusiast-to-enthusiast, knowledgeable, welcoming to new players.
+- Trust signals: years in business, judge-certified staff, secure trade policies.`;
+  }
+  if (/\b(agency|marketing|consultant|consulting|seo|ppc|growth|branding)\b/.test(haystack)) {
+    return `INDUSTRY: Marketing / consulting agency.
+- Palette: confident professional — deep navy (#0b1d3a) + teal accent (#14b8a6) OR creative palette (deep purple #4c1d95 + warm orange #f97316). Crisp white or near-black backgrounds.
+- Visuals: data viz suggestions (CSS bars / sparklines), case-study cards, large client logos block (placeholder wordmarks OK).
+- Sections to include: Services breakdown with outcomes ("+X% revenue", "Y month payback"), 2–3 case studies with metric callouts, methodology / process, leadership team mini-bios, CTA for a free strategy call.
+- Tone: confident, outcome-driven, no fluff.
+- Trust signals: named brands worked with (placeholders), measurable results, methodology framework name.`;
+  }
+  if (/\b(restaurant|bistro|kitchen|eatery|grill|pizz|sushi|ramen|taco|burger)\b/.test(haystack)) {
+    return `INDUSTRY: Restaurant.
+- Palette: warm, appetite-stimulating — deep red, charcoal, cream OR seasonal palette tuned to cuisine.
+- Sections: Signature dishes, menu highlights with prices, chef / story, reservations CTA prominent in hero AND nav, hours + location, private events.
+- Trust signals: years open, chef credentials, press mentions, reservation platform mentioned.`;
+  }
+  if (/\b(gym|fitness|crossfit|yoga|pilates|studio|trainer|boxing)\b/.test(haystack)) {
+    return `INDUSTRY: Fitness studio / gym.
+- Palette: high-energy — electric red/orange + black, OR calm wellness palette (sage + cream + charcoal) depending on description.
+- Sections: Class schedule grid, trainers / coaches, intro offer CTA, transformation testimonials, FAQ on first class.
+- Trust signals: certifications, member count, before/after framing (no body shaming).`;
+  }
+  if (/\b(law|attorney|firm|legal|counsel)\b/.test(haystack)) {
+    return `INDUSTRY: Law firm.
+- Palette: navy + cream + brass accents OR muted charcoal + deep green. Serif headlines, generous whitespace.
+- Sections: Practice areas grid, attorney bios with credentials, case results disclaimer, free consultation CTA, FAQ.
+- Trust signals: bar admissions, years practicing, peer recognition, confidentiality assurance.`;
+  }
+  if (/\b(real\s*estate|realtor|broker|realty)\b/.test(haystack)) {
+    return `INDUSTRY: Real estate.
+- Palette: sophisticated — deep navy or charcoal + warm white + gold accent.
+- Sections: Featured listings grid (use plausible placeholder property cards), neighborhood guides, buyer vs seller paths, agent bio, home valuation CTA.
+- Trust signals: years in market, transaction volume, MLS / brokerage affiliation.`;
+  }
+  if (/\b(saas|tech|startup|software|platform|api|developer)\b/.test(haystack)) {
+    return `INDUSTRY: SaaS / tech startup.
+- Palette: gradient mesh hero (purple / cyan or magenta / orange), dark or light mode equally valid.
+- Sections: Hero with product value prop + screenshot/illustration placeholder (CSS-only), feature grid with icons (inline SVG), pricing 3-tier table, customer logo bar, integrations or API mention, signup CTA prominent.
+- Trust signals: customer logos, security/compliance badges (SOC2, GDPR — only if mentioned), uptime stat.`;
+  }
+  if (/\b(salon|spa|barber|wellness|beauty|nails)\b/.test(haystack)) {
+    return `INDUSTRY: Salon / spa.
+- Palette: editorial luxury — porcelain ivory + bronze/rose + deep charcoal text.
+- Sections: Service menu with pricing, stylists / therapists with photos placeholder, booking CTA, gift cards.
+- Trust signals: years in business, signature treatments, certifications.`;
+  }
+  if (/\b(boutique|retail|shop|store)\b/.test(haystack)) {
+    return `INDUSTRY: Boutique / retail.
+- Palette: editorial — neutral canvas + one bold accent tuned to the description.
+- Sections: Collection / category grid, featured products, brand story, in-store experience, hours + location.
+- Trust signals: years open, locally owned, curated selection.`;
+  }
+  return `INDUSTRY: ${businessType}.
+- Choose a palette appropriate for the audience described.
+- Include sections that match the dominant business goal (sell product, book service, generate leads, or inform).
+- Trust signals appropriate to the category (longevity, certifications, results, press, community ties).`;
+}
+
 // ----- System prompt builder -----
-function buildSystemPrompt({ theme, variantHint, compliance, analytics, businessType, description }) {
+function buildSystemPrompt({
+  theme,
+  variantHint,
+  compliance,
+  analytics,
+  businessType,
+  description,
+  conversion,
+  refinementInstructions,
+  logo,
+}) {
   const cannabis = compliance?.ageGate || isCannabisBusiness(businessType, description);
   const themePalette = getTheme(theme);
+  const industryRules = getIndustryRules(businessType, description);
 
   return `You are a senior product designer at a top-tier digital studio (Stripe / Apple / Linear caliber). You generate complete, single-file HTML websites that look and feel like billion-dollar brand sites.
 
 # OUTPUT FORMAT
 Return ONLY the raw HTML document, starting with <!DOCTYPE html>. NO markdown fences. NO commentary. NO explanations before or after.
+
+# INDUSTRY RULES (REQUIRED — follow these strictly)
+${industryRules}
 
 # DESIGN SYSTEM
 Palette: ${themePalette.name}
@@ -223,12 +359,55 @@ ${
     : ''
 }
 ${
-  analytics?.ga4 || analytics?.metaPixel
+  analytics?.ga4 || analytics?.metaPixel || analytics?.hotjar
     ? `# ANALYTICS PLACEHOLDERS
-Leave a comment <!-- ANALYTICS_INJECTION_POINT --> immediately before </head>. The server will inject GA4/Meta Pixel snippets there. Do NOT add your own tracking code.\n`
+Leave a comment <!-- ANALYTICS_INJECTION_POINT --> immediately before </head>. The server will inject GA4 / Meta Pixel / Hotjar snippets there. Do NOT add your own tracking code.\n`
     : ''
 }
-${variantHint ? `# VARIANT GUIDANCE\n${variantHint}\n` : ''}
+${
+  conversion?.exitIntent
+    ? `# EXIT-INTENT EMAIL CAPTURE (REQUIRED)
+Include a hidden popup with id="exit-popup" at the end of <body>. Trigger it on the first \`mouseleave\` where \`event.clientY < 0\` after the user has been on the page > 8 seconds, only once per session (sessionStorage key \`exit_seen\`). Copy: headline "Before you go —", body offers a discount or value-add appropriate to the business, single email input, "Get it" submit button (form has \`onsubmit="return false"\` so it does not actually submit), and a small "No thanks" close link. Style consistent with the rest of the site. Suppress on touch devices.\n`
+    : ''
+}
+${
+  conversion?.abHeadline
+    ? `# A/B HEADLINE TEST (REQUIRED)
+Inside the hero, render BOTH headline variants like this:
+  <div id="headline-test" data-ab="headline">
+    <h1 class="variant-a" hidden><!-- benefit-led version --></h1>
+    <h1 class="variant-b" hidden><!-- trust-led version --></h1>
+  </div>
+Add a small inline script that picks a stable variant from \`localStorage.getItem('ab_headline')\` (assign 'a' or 'b' on first visit), reveals the chosen one, and pushes a \`gtag('event','ab_headline',{variant})\` if \`window.gtag\` exists.\n`
+    : ''
+}
+${
+  conversion?.chatbot
+    ? `# CHATBOT FRAMEWORK PLACEHOLDER (REQUIRED)
+Add a floating chat button bottom-right with id="chat-toggle" that opens a panel #chat-panel containing a transcript area and an input. Wire the send button to call \`window.GENESIS_CHATBOT?.send(message)\` if defined, otherwise show "Chatbot not configured yet — add your Anthropic key in chatbot-config.js to enable." Include the framework script inline:
+  <script>
+  window.GENESIS_CHATBOT = window.GENESIS_CHATBOT || {
+    apiKey: '', // owner: paste your Anthropic API key here to enable
+    model: 'claude-sonnet-4-5-20250929',
+    systemPrompt: "You are a helpful assistant for THIS_BUSINESS_NAME. Answer concisely.",
+    async send(msg) { /* implementation provided by owner */ }
+  };
+  </script>
+Do NOT include any real API key.\n`
+    : ''
+}
+${
+  logo
+    ? `# CLIENT-PROVIDED LOGO (REQUIRED)
+The partner uploaded a brand logo. In the <header>, render an <img id="brand-logo" alt="${(logo.alt || 'Logo').replace(/"/g, '\\"')}" src="" /> as the FIRST child of the header (before the wordmark / nav). Leave the src ATTRIBUTE EMPTY — the server will inject the real image bytes after generation. Size the logo at about 36–44px tall in the header (no fixed width). Do NOT include the wordmark text adjacent to the logo if the logo already contains a wordmark glyph; instead use a small <span class="brand-name"> with the business name to the right of the logo for accessibility, optionally hidden visually if the logo is wordmark-only.\n`
+    : ''
+}${variantHint ? `# VARIANT GUIDANCE\n${variantHint}\n` : ''}
+${
+  refinementInstructions
+    ? `# REFINEMENT INSTRUCTIONS (apply on top of the design system, not replacing it)
+${refinementInstructions}\n`
+    : ''
+}
 
 # QUALITY BAR
 Treat this as a launch-day production site for a brand competing with the best. Every section should feel deliberate, every interaction smooth, every word on-brand for the business described.
@@ -237,11 +416,27 @@ Begin output now with <!DOCTYPE html>.`;
 }
 
 // ----- Variant hints (used when generating multiple variants for A/B comparison) -----
-const VARIANT_HINTS = [
-  'Variant A — "Bold & Editorial": oversized display type, asymmetric hero, statement headline that leads with a benefit. Primary CTA is the focal point.',
-  'Variant B — "Minimal & Trust-First": calmer hero, social proof / trust badges immediately below the fold, conversion-optimized form copy. Lead with credibility.',
-  'Variant C — "Story-Driven": narrative hero (problem → promise → resolution), longer copy, founder voice. Lead with empathy.',
+const VARIANT_PROFILES = [
+  {
+    key: 'professional',
+    label: 'Professional',
+    description: 'Conservative, trust-focused, established. Best for partners who want to convey reliability.',
+    hint: 'VARIANT — PROFESSIONAL:\n- Tone: authoritative, established, dependable. Lead with credibility and proof.\n- Palette: deep navy or charcoal + soft cream/ivory + a single muted accent. Avoid neon or playful colors.\n- Typography: refined serif headlines (system serif stack) paired with crisp sans-serif body. Generous line height.\n- Layout: traditional grid, clear hierarchy, symmetric hero. Trust badges and credentials immediately below the hero.\n- CTA: "Get a Consultation" / "Schedule a Call" / "Learn More" — measured language.',
+  },
+  {
+    key: 'modern',
+    label: 'Modern',
+    description: 'Bold, contemporary, dynamic. Best for partners chasing energy and momentum.',
+    hint: 'VARIANT — MODERN:\n- Tone: innovative, energetic, forward-thinking. Lead with a sharp benefit.\n- Palette: high-contrast — a bold primary (electric blue, hot magenta, or vivid orange) on near-black or pure white. Use the gradient mesh aggressively.\n- Typography: modern sans-serif throughout, oversized display headline (clamp from 2.5rem to 5rem). Tight letter-spacing on display.\n- Layout: asymmetric hero, scroll-driven reveals more pronounced, larger cards with strong hover lifts.\n- CTA: "Start Now" / "Try It Free" / "Get Started" — action-led.',
+  },
+  {
+    key: 'premium',
+    label: 'Premium',
+    description: 'Luxury positioning, elegant, aspirational. Best for partners with a high-end audience.',
+    hint: 'VARIANT — PREMIUM:\n- Tone: exclusive, refined, aspirational. Lead with craft and curation.\n- Palette: black or deep charcoal canvas + cream (#f4ecd8) + muted gold (#c9a85b) accents. NO neon. Subtle shimmer on gold.\n- Typography: elegant serif throughout (system serif stack), generous whitespace, restrained color use.\n- Layout: minimalist, spacious. Single editorial hero photograph (via CSS gradient placeholder), large body type, generous section padding.\n- CTA: "Reserve" / "Inquire" / "Request Access" — invitation, not transaction.',
+  },
 ];
+const VARIANT_HINTS = VARIANT_PROFILES.map(p => p.hint);
 
 // ----- Strip markdown fences if model wrapped output -----
 function stripCodeFences(text) {
@@ -250,6 +445,114 @@ function stripCodeFences(text) {
   const fenceMatch = trimmed.match(/^```(?:html)?\s*\n([\s\S]*?)\n```\s*$/i);
   if (fenceMatch) return fenceMatch[1].trim();
   return trimmed;
+}
+
+// ----- Validate + normalize a logo payload from the client -----
+// Accepts { dataUri, mimeType, alt, publicUrl } and returns a sanitized object,
+// or null if the input is missing/invalid.
+const ALLOWED_LOGO_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/svg+xml',
+  'image/gif',
+]);
+const MAX_LOGO_BYTES = 200 * 1024; // 200KB of base64 (~150KB raw)
+
+function sanitizeLogo(logo, businessName) {
+  if (!logo || typeof logo !== 'object') return null;
+  let { dataUri, mimeType, alt, publicUrl } = logo;
+
+  // Accept either a data URI or a public URL (or both).
+  let validDataUri = null;
+  if (typeof dataUri === 'string' && dataUri.startsWith('data:')) {
+    const m = dataUri.match(/^data:([a-z0-9.+\-]+\/[a-z0-9.+\-]+);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (m) {
+      const mt = m[1].toLowerCase();
+      if (ALLOWED_LOGO_MIME_TYPES.has(mt) && dataUri.length <= MAX_LOGO_BYTES * 1.4) {
+        validDataUri = dataUri.replace(/\s+/g, '');
+        mimeType = mt;
+      }
+    }
+  }
+
+  let validPublicUrl = null;
+  if (typeof publicUrl === 'string') {
+    const trimmed = publicUrl.trim();
+    if (/^https:\/\/[^\s"'<>]{4,2000}$/i.test(trimmed)) {
+      validPublicUrl = trimmed;
+    }
+  }
+
+  if (!validDataUri && !validPublicUrl) return null;
+
+  const safeAlt = (typeof alt === 'string' && alt.trim() ? alt.trim() : (businessName || 'Logo')).slice(0, 120);
+  return {
+    dataUri: validDataUri,
+    mimeType: mimeType || null,
+    alt: safeAlt,
+    publicUrl: validPublicUrl,
+  };
+}
+
+// ----- Inject the validated logo into the generated HTML -----
+// Strategy: prefer a <img id="brand-logo"> placeholder Claude was instructed to emit;
+// if missing, insert one at the top of the first <header>. Also injects favicon
+// <link rel="icon"> and (when a public URL is provided) ensures the og:image meta uses it.
+function injectLogo(html, logo) {
+  if (!html || !logo) return html;
+  const src = logo.dataUri || logo.publicUrl;
+  if (!src) return html;
+  const alt = (logo.alt || '').replace(/"/g, '&quot;');
+
+  let out = html;
+  const imgTag = `<img id="brand-logo" src="${src}" alt="${alt}" style="display:inline-block;height:36px;width:auto;max-width:200px;vertical-align:middle;" />`;
+
+  // NOTE: All .replace() calls below MUST use function-replacements (not string-replacements).
+  // The replacement strings include user-supplied URLs, and String.prototype.replace
+  // interprets $&, $`, $', $$, and $n inside string replacements as special patterns.
+  // Function replacements return literal strings and are immune to that interpretation.
+
+  // 1. Replace placeholder <img id="brand-logo" ...> if Claude emitted one.
+  const placeholderRe = /<img\b[^>]*\bid=["']brand-logo["'][^>]*\/?>/i;
+  if (placeholderRe.test(out)) {
+    out = out.replace(placeholderRe, () => imgTag);
+  } else {
+    // 2. Otherwise, inject right inside the first <header ...>.
+    const headerOpenRe = /(<header\b[^>]*>)/i;
+    if (headerOpenRe.test(out)) {
+      out = out.replace(headerOpenRe, (m) => `${m}\n  ${imgTag}`);
+    } else {
+      // 3. Last resort: prepend to <body>.
+      out = out.replace(/<body\b[^>]*>/i, (match) => `${match}\n${imgTag}`);
+    }
+  }
+
+  // 4. Favicon: add <link rel="icon" ...> in <head> if not already present.
+  if (!/<link[^>]+rel=["'](?:icon|shortcut icon)["']/i.test(out)) {
+    const faviconTag = `<link rel="icon" type="${logo.mimeType || 'image/png'}" href="${src}" />`;
+    out = out.replace(/<\/head>/i, () => `  ${faviconTag}\n</head>`);
+  }
+
+  // 5. og:image: prefer publicUrl; data URIs are not valid for og:image.
+  if (logo.publicUrl) {
+    const ogTag = `<meta property="og:image" content="${logo.publicUrl}" />`;
+    if (/<meta[^>]+property=["']og:image["']/i.test(out)) {
+      out = out.replace(/<meta[^>]+property=["']og:image["'][^>]*>/i, () => ogTag);
+    } else {
+      out = out.replace(/<\/head>/i, () => `  ${ogTag}\n</head>`);
+    }
+    // Twitter card image too.
+    const twTag = `<meta name="twitter:image" content="${logo.publicUrl}" />`;
+    if (/<meta[^>]+name=["']twitter:image["']/i.test(out)) {
+      out = out.replace(/<meta[^>]+name=["']twitter:image["'][^>]*>/i, () => twTag);
+    } else {
+      out = out.replace(/<\/head>/i, () => `  ${twTag}\n</head>`);
+    }
+  }
+
+  return out;
 }
 
 // ----- Inject GA4 + Meta Pixel snippets into generated HTML -----
@@ -264,6 +567,11 @@ function injectAnalytics(html, analytics) {
   if (analytics.metaPixel && /^\d{6,}$/.test(analytics.metaPixel)) {
     snippets.push(
       `<!-- Meta Pixel -->\n<script>!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init','${analytics.metaPixel}');fbq('track','PageView');</script><noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=${analytics.metaPixel}&ev=PageView&noscript=1"/></noscript>`
+    );
+  }
+  if (analytics.hotjar && /^\d{6,}$/.test(analytics.hotjar)) {
+    snippets.push(
+      `<!-- Hotjar -->\n<script>(function(h,o,t,j,a,r){h.hj=h.hj||function(){(h.hj.q=h.hj.q||[]).push(arguments)};h._hjSettings={hjid:${analytics.hotjar},hjsv:6};a=o.getElementsByTagName('head')[0];r=o.createElement('script');r.async=1;r.src=t+h._hjSettings.hjid+j+h._hjSettings.hjsv;a.appendChild(r);})(window,document,'https://static.hotjar.com/c/hotjar-','.js?sv=');</script>`
     );
   }
   if (!snippets.length) return html;
@@ -411,7 +719,20 @@ function scoreSeo(html) {
 
 // ----- Generate a single variant -----
 async function generateOne(client, opts) {
-  const { businessType, businessName, location, description, theme, compliance, analytics, variantHint } = opts;
+  const {
+    businessType,
+    businessName,
+    location,
+    description,
+    theme,
+    compliance,
+    analytics,
+    variantHint,
+    conversion,
+    refinementInstructions,
+    sourceHtml,
+    logo,
+  } = opts;
 
   const systemPrompt = buildSystemPrompt({
     theme,
@@ -420,9 +741,24 @@ async function generateOne(client, opts) {
     analytics,
     businessType,
     description,
+    conversion,
+    refinementInstructions,
+    logo,
   });
 
-  const userPrompt = `Create a production-grade marketing website for:
+  const userPrompt = sourceHtml
+    ? `Refine this existing website with the requested instructions in the system prompt. Preserve structure and brand voice, but apply the refinements faithfully. Return the COMPLETE refined HTML.
+
+Business Type: ${businessType}
+Business Name: ${businessName}
+Location: ${location}
+Description: ${description}
+${compliance?.licenseNumber ? `License Number: ${compliance.licenseNumber}\n` : ''}${compliance?.state ? `Operating State: ${compliance.state}\n` : ''}${compliance?.minAge ? `Minimum Age: ${compliance.minAge}\n` : ''}
+--- CURRENT HTML ---
+${sourceHtml}
+--- END CURRENT HTML ---
+Return the COMPLETE refined HTML now.`
+    : `Create a production-grade marketing website for:
 
 Business Type: ${businessType}
 Business Name: ${businessName}
@@ -440,6 +776,7 @@ Build the entire single-file HTML now.`;
 
   const textBlock = response.content.find(b => b.type === 'text');
   let html = stripCodeFences(textBlock ? textBlock.text : '');
+  html = injectLogo(html, logo);
   html = injectAnalytics(html, analytics);
   const seo = scoreSeo(html);
 
@@ -474,6 +811,8 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
 
     const client = new Anthropic({ apiKey });
     const count = Math.max(1, Math.min(3, parseInt(variantCount, 10) || 1));
+    const conversion = body.conversion || {};
+    const logo = sanitizeLogo(body.logo, businessName);
 
     // If only one variant, no variant hint. If multiple, pass the variant prompts.
     const variants = await Promise.all(
@@ -486,8 +825,13 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
           theme,
           compliance,
           analytics,
+          conversion,
+          logo,
           variantHint: count > 1 ? VARIANT_HINTS[i] : null,
-        })
+        }).then(result => ({
+          ...result,
+          profile: count > 1 ? VARIANT_PROFILES[i] : null,
+        }))
       )
     );
 
@@ -501,7 +845,8 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
       meta: {
         count,
         cannabis: isCannabisBusiness(businessType, description) || !!compliance?.ageGate,
-        analyticsInjected: !!(analytics?.ga4 || analytics?.metaPixel),
+        analyticsInjected: !!(analytics?.ga4 || analytics?.metaPixel || analytics?.hotjar),
+        logoInjected: !!logo,
       },
     });
   } catch (error) {
@@ -521,9 +866,145 @@ app.post('/api/seo-score', (req, res) => {
   }
 });
 
+// ----- Available variant profiles (so the UI can label tabs Professional / Modern / Premium) -----
+app.get('/api/variants', (req, res) => {
+  res.json({
+    success: true,
+    variants: VARIANT_PROFILES.map(({ key, label, description }) => ({ key, label, description })),
+  });
+});
+
+// ----- AI Suggestions: analyze the description and surface 3 actionable improvements -----
+app.post('/api/suggest', suggestLimiter, async (req, res) => {
+  try {
+    const { description = '', businessType = '', location = '' } = req.body || {};
+    if (description.trim().length < 30) {
+      return res.json({ success: true, suggestions: [] });
+    }
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
+    }
+    const client = new Anthropic({ apiKey });
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-5-20250929',
+      max_tokens: 600,
+      system:
+        'You are a senior conversion-copy strategist. Read a business description and return EXACTLY 3 short, actionable suggestions (1–2 sentences each) to make the resulting marketing website more effective — each suggestion must reference something concrete in the description (audience, offer, location, differentiator) and explain the website implication. Return ONLY a JSON array of 3 strings. No prose, no markdown, no keys.',
+      messages: [
+        {
+          role: 'user',
+          content: `Business type: ${businessType}\nLocation: ${location}\nDescription: """${description}"""\n\nReturn JSON array now.`,
+        },
+      ],
+    });
+    const text = (response.content.find(b => b.type === 'text')?.text || '').trim();
+    let suggestions = [];
+    try {
+      const start = text.indexOf('[');
+      const end = text.lastIndexOf(']');
+      if (start >= 0 && end > start) {
+        suggestions = JSON.parse(text.slice(start, end + 1));
+      }
+    } catch {
+      suggestions = [];
+    }
+    if (!Array.isArray(suggestions)) suggestions = [];
+    suggestions = suggestions.filter(s => typeof s === 'string' && s.trim().length > 0).slice(0, 3);
+    res.json({ success: true, suggestions });
+  } catch (error) {
+    console.error('Suggest error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// ----- AI Refinement: take an existing HTML + a set of refinement options, regenerate -----
+const REFINEMENT_INSTRUCTIONS = {
+  toneProfessional: 'Make the overall tone more professional and authoritative. Tighten copy. Replace casual phrases with industry-confident language.',
+  toneCasual: 'Make the tone friendlier and more conversational. Use contractions, second person, warmer micro-copy.',
+  toneUrgent: 'Make CTAs and headlines more action-oriented and urgency-driven (without manipulative pressure). Use stronger verbs.',
+  toneLuxury: 'Elevate the tone to premium / luxurious. Slow the pacing of copy, use more elegant phrasing, restrain exclamation.',
+  copyShorten: 'Shorten every section’s prose by ~30%. Convert long paragraphs to crisp bullet points where appropriate. Keep meaning.',
+  copyExpand: 'Expand the copy with more concrete detail — specific benefits, audience nouns, sensory or technical language.',
+  copyLocalSEO: 'Add local SEO depth: weave the city + state into headlines, subheads, the JSON-LD schema, and section copy. Reference nearby neighborhoods or landmarks plausibly.',
+  copyEmphasizeOffer: 'Emphasize the headline product or service throughout: it should appear in the hero headline, the meta description, and the primary CTA.',
+  designBolder: 'Make the colors bolder and the contrast higher. Increase headline weight and size. More saturated accent color.',
+  designSofter: 'Soften the palette and tone down contrast. Use more whitespace, calmer accent color, lighter type weights.',
+  designMoreWhitespace: 'Increase whitespace and section padding by ~30%. Reduce density of cards / grids.',
+  designRicher: 'Add more visual richness — additional gradient layers, more card variations, subtle decorative SVG elements.',
+};
+const REFINEMENT_KEYS = Object.keys(REFINEMENT_INSTRUCTIONS);
+
+app.post('/api/refine', refineLimiter, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const {
+      businessType,
+      businessName,
+      location,
+      description,
+      theme,
+      compliance,
+      analytics,
+      conversion,
+      sourceHtml,
+      refinements,
+      customInstruction,
+      variantHint,
+    } = body;
+    if (!businessName || !businessType || !location || !description) {
+      return res.status(400).json({ success: false, error: 'businessName, businessType, location, description are required' });
+    }
+    if (!sourceHtml || typeof sourceHtml !== 'string' || sourceHtml.length < 200) {
+      return res.status(400).json({ success: false, error: 'sourceHtml is required (generate first, then refine)' });
+    }
+    const selectedKeys = Array.isArray(refinements) ? refinements.filter(k => REFINEMENT_KEYS.includes(k)) : [];
+    const lines = selectedKeys.map(k => `- ${REFINEMENT_INSTRUCTIONS[k]}`);
+    if (customInstruction && typeof customInstruction === 'string' && customInstruction.trim().length > 0) {
+      lines.push(`- ${customInstruction.trim().slice(0, 600)}`);
+    }
+    if (!lines.length) {
+      return res.status(400).json({ success: false, error: 'Pick at least one refinement or provide a customInstruction.' });
+    }
+
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    if (!apiKey) return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
+    const client = new Anthropic({ apiKey });
+
+    const logo = sanitizeLogo(body.logo, businessName);
+
+    const result = await generateOne(client, {
+      businessType,
+      businessName,
+      location,
+      description,
+      theme,
+      compliance,
+      analytics,
+      conversion: conversion || {},
+      logo,
+      variantHint: variantHint || null,
+      refinementInstructions: lines.join('\n'),
+      sourceHtml,
+    });
+
+    res.json({
+      success: true,
+      html: result.html,
+      seo: result.seo,
+      applied: selectedKeys,
+      customInstruction: customInstruction || null,
+      logoInjected: !!logo,
+    });
+  } catch (error) {
+    console.error('Refine error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(
-    `GENESIS Website Builder v2.1 running on port ${PORT} (password gate ${
+    `GENESIS Website Builder v2.3 running on port ${PORT} (password gate ${
       BUILDER_PASSWORD ? 'ON' : 'OFF'
     }, generate limit ${GENERATE_LIMIT_PER_HOUR}/hr per IP)`
   );
