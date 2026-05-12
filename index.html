@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GENESIS Website Builder · v2.2</title>
+<title>GENESIS Website Builder · v2.3</title>
 <meta name="description" content="AI-powered website builder by GENESIS. Generate production-grade marketing sites with named variants (Professional / Modern / Premium), industry-specific design rules, AI refinement, and built-in SEO scoring." />
 <style>
   :root {
@@ -303,6 +303,70 @@
   .rec-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
   .rec { font-size: 12.5px; line-height: 1.45; color: #fde68a; padding: 8px 10px; border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; background: rgba(245,158,11,0.06); }
 
+  /* ----- Logo upload section ----- */
+  .logo-upload { display: flex; flex-direction: column; gap: 10px; }
+  .logo-dropzone {
+    border: 1px dashed var(--border-2);
+    border-radius: 12px;
+    padding: 18px 14px;
+    text-align: center;
+    color: var(--muted);
+    background: rgba(255,255,255,0.015);
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, background-color 0.15s;
+  }
+  .logo-dropzone:hover, .logo-dropzone.is-dragover {
+    border-color: var(--accent-2);
+    background: rgba(34,211,238,0.06);
+    color: var(--text);
+  }
+  .logo-dropzone input[type="file"] { display: none; }
+  .logo-preview {
+    display: none;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-2);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.02);
+  }
+  .logo-preview.show { display: flex; }
+  .logo-preview img {
+    max-height: 48px;
+    max-width: 120px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.95);
+    padding: 4px;
+    object-fit: contain;
+  }
+  .logo-preview .meta {
+    flex: 1 1 auto;
+    font-size: 12px;
+    color: var(--muted);
+    line-height: 1.5;
+    word-break: break-word;
+  }
+  .logo-preview .meta strong { color: var(--text); font-weight: 600; }
+  .logo-remove {
+    background: transparent;
+    border: 1px solid var(--border-2);
+    color: var(--muted);
+    padding: 6px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 11.5px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .logo-remove:hover { color: #ff8a8a; border-color: rgba(255,138,138,0.4); }
+  .logo-error {
+    display: none;
+    margin-top: 4px;
+    color: #ff8a8a;
+    font-size: 12px;
+  }
+  .logo-error.show { display: block; }
+
   /* ----- AI suggestions bubble (below description) ----- */
   .suggest-box {
     margin-top: 8px;
@@ -322,6 +386,106 @@
   }
   .suggest-box ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
   .suggest-box.loading .head::after { content: "…"; }
+
+  /* ----- Header "Need Help?" CTA ----- */
+  .header-cta {
+    display: inline-flex; align-items: center; gap: 6px;
+    margin-left: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 7px 13px;
+    font-size: 12.5px;
+    border-radius: 999px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background-color 0.15s, border-color 0.15s, transform 0.05s;
+    backdrop-filter: blur(8px);
+  }
+  .header-cta:hover {
+    background: rgba(124, 92, 255, 0.18);
+    border-color: rgba(124, 92, 255, 0.45);
+  }
+  @media (max-width: 600px) {
+    .header-cta span.label { display: none; }
+  }
+
+  /* ----- Post-generation consultation CTA ----- */
+  .consult-cta {
+    display: none;
+    margin: 14px 0 8px;
+    padding: 22px 22px 18px;
+    border-radius: 14px;
+    background:
+      radial-gradient(120% 100% at 0% 0%, rgba(124, 92, 255, 0.45), transparent 60%),
+      radial-gradient(120% 120% at 100% 100%, rgba(34, 211, 238, 0.40), transparent 65%),
+      linear-gradient(135deg, #5b3fd2 0%, #2c5fb3 50%, #1f7a8c 100%);
+    color: #ffffff;
+    text-align: left;
+    box-shadow: 0 14px 38px rgba(124, 92, 255, 0.18);
+  }
+  .consult-cta.show { display: block; }
+  .consult-cta .brand {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 12px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px;
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 600;
+  }
+  .consult-cta .brand img {
+    width: 36px; height: 36px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 4px;
+    flex: 0 0 36px;
+  }
+  .consult-cta h3 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    line-height: 1.25;
+    letter-spacing: 0.2px;
+  }
+  .consult-cta p {
+    margin: 0 0 14px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: rgba(255, 255, 255, 0.92);
+  }
+  .consult-cta .actions {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .consult-cta .btn-primary {
+    background: #ffffff;
+    color: #2a2456;
+    border: none;
+    padding: 12px 20px;
+    font-size: 14.5px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+    transition: transform 0.08s, box-shadow 0.15s;
+  }
+  .consult-cta .btn-primary:hover { transform: translateY(-1px); box-shadow: 0 10px 22px rgba(0,0,0,0.22); }
+  .consult-cta .btn-secondary {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.45);
+    padding: 12px 20px;
+    font-size: 14.5px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.15s, transform 0.08s;
+  }
+  .consult-cta .btn-secondary:hover { background: rgba(255,255,255,0.22); transform: translateY(-1px); }
+  .consult-cta .perks {
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.6;
+  }
 
   /* ----- Refinement panel ----- */
   .refine-panel {
@@ -383,11 +547,14 @@
 <header class="app-header">
   <div class="brand">
     <div class="logo"></div>
-    <div class="name">GENESIS<span>·</span>Website Builder<span class="pill">v2.2</span></div>
+    <div class="name">GENESIS<span>·</span>Website Builder<span class="pill">v2.3</span></div>
   </div>
   <div class="health" id="health">
     <span class="dot" id="healthDot"></span>
     <span id="healthLabel">checking…</span>
+    <button type="button" class="header-cta" id="headerHelpBtn" aria-label="Talk to us about your website">
+      <span aria-hidden="true">💬</span><span class="label">Need help? Talk to us</span>
+    </button>
   </div>
 </header>
 
@@ -496,6 +663,30 @@
         </div>
       </details>
 
+      <details class="section" id="logoSection">
+        <summary>Logo (optional)</summary>
+        <div class="body logo-upload">
+          <label class="logo-dropzone" id="logoDropzone" for="logoFile">
+            <span id="logoDropzoneLabel">Click or drop a logo file (SVG / PNG / JPG / WebP, &lt; 150KB)</span>
+            <input id="logoFile" type="file" accept="image/svg+xml,image/png,image/jpeg,image/webp,image/gif" />
+          </label>
+          <div class="logo-preview" id="logoPreview" aria-live="polite">
+            <img id="logoPreviewImg" alt="" />
+            <div class="meta">
+              <strong id="logoPreviewName"></strong>
+              <div id="logoPreviewSize"></div>
+            </div>
+            <button type="button" class="logo-remove" id="logoRemoveBtn" aria-label="Remove uploaded logo">Remove</button>
+          </div>
+          <div class="logo-error" id="logoError" role="alert"></div>
+          <div class="field">
+            <label for="logoPublicUrl">Public logo URL (optional, for social-share previews)</label>
+            <input id="logoPublicUrl" name="logoPublicUrl" type="url" placeholder="https://example.com/logo.png" pattern="https://.*" />
+          </div>
+          <p class="hint">The uploaded file is embedded inline in the generated HTML (so the downloadable site is self-contained). The optional URL is used for the social-share preview (og:image / twitter:image) since data URIs can’t be used there.</p>
+        </div>
+      </details>
+
       <details class="section" id="analyticsSection">
         <summary>Analytics</summary>
         <div class="body">
@@ -594,6 +785,20 @@
           <div class="hint">Recommendations will appear here.</div>
         </div>
 
+        <div class="consult-cta" id="consultCta" aria-live="polite">
+          <div class="brand">
+            <img src="/assets/adgorhythms-logo.webp" alt="ADgorhythms" />
+            <span>Powered by ADgorhythms</span>
+          </div>
+          <h3 id="consultHeadline">Love this website? Let’s make it even better.</h3>
+          <p id="consultBody">Our team can customize this with your logo, add more pages, integrate e-commerce, optimize for SEO, and get you ranking on Google.</p>
+          <div class="actions">
+            <button type="button" class="btn-primary" id="consultBookBtn">📅 <span id="consultBookLabel">Book Free 15-Min Consultation</span></button>
+            <button type="button" class="btn-secondary" id="consultDownloadBtn">⬇️ Download As-Is</button>
+          </div>
+          <p class="perks">✓ Custom logo design   ✓ Multi-page sites   ✓ E-commerce   ✓ Professional SEO   ✓ Ongoing support</p>
+        </div>
+
         <div class="refine-panel" id="refinePanel">
           <h4>AI Refinement</h4>
           <p class="lead">Tweak the active variant without starting over. Pick adjustments, then Apply.</p>
@@ -666,6 +871,16 @@
   const abHeadline = document.getElementById('abHeadline');
   const chatbot = document.getElementById('chatbot');
   const hotjar = document.getElementById('hotjar');
+  const logoFile = document.getElementById('logoFile');
+  const logoDropzone = document.getElementById('logoDropzone');
+  const logoDropzoneLabel = document.getElementById('logoDropzoneLabel');
+  const logoPreview = document.getElementById('logoPreview');
+  const logoPreviewImg = document.getElementById('logoPreviewImg');
+  const logoPreviewName = document.getElementById('logoPreviewName');
+  const logoPreviewSize = document.getElementById('logoPreviewSize');
+  const logoRemoveBtn = document.getElementById('logoRemoveBtn');
+  const logoError = document.getElementById('logoError');
+  const logoPublicUrl = document.getElementById('logoPublicUrl');
 
   let state = {
     variants: [],
@@ -673,7 +888,97 @@
     selectedTheme: 'obsidian',
     selectedCount: 1,
     lastPayload: null,
+    logo: null, // { dataUri, mimeType, alt, fileName, fileSize }
   };
+
+  // ---- Logo upload handling ----
+  const ALLOWED_LOGO_TYPES = ['image/png','image/jpeg','image/webp','image/svg+xml','image/gif'];
+  const MAX_LOGO_BYTES = 150 * 1024;
+
+  function setLogoError(msg) {
+    if (msg) { logoError.textContent = msg; logoError.classList.add('show'); }
+    else { logoError.textContent = ''; logoError.classList.remove('show'); }
+  }
+  function clearLogo() {
+    state.logo = null;
+    logoFile.value = '';
+    logoPreview.classList.remove('show');
+    logoPreviewImg.removeAttribute('src');
+    logoPreviewName.textContent = '';
+    logoPreviewSize.textContent = '';
+    setLogoError('');
+  }
+  logoRemoveBtn.addEventListener('click', clearLogo);
+  function formatBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024*1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024*1024)).toFixed(2) + ' MB';
+  }
+  function handleLogoFile(file) {
+    setLogoError('');
+    if (!file) return;
+    if (!ALLOWED_LOGO_TYPES.includes(file.type)) {
+      setLogoError('Unsupported file type. Use SVG, PNG, JPG, WebP, or GIF.');
+      logoFile.value = '';
+      return;
+    }
+    if (file.size > MAX_LOGO_BYTES) {
+      setLogoError('Logo is ' + formatBytes(file.size) + '. Max 150 KB — try compressing or use SVG.');
+      logoFile.value = '';
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUri = String(reader.result || '');
+      if (!dataUri.startsWith('data:')) {
+        setLogoError('Could not read file.');
+        return;
+      }
+      state.logo = {
+        dataUri,
+        mimeType: file.type,
+        alt: '',
+        fileName: file.name,
+        fileSize: file.size,
+      };
+      logoPreviewImg.src = dataUri;
+      logoPreviewName.textContent = file.name;
+      logoPreviewSize.textContent = file.type + ' · ' + formatBytes(file.size);
+      logoPreview.classList.add('show');
+    };
+    reader.onerror = () => setLogoError('Could not read file.');
+    reader.readAsDataURL(file);
+  }
+  logoFile.addEventListener('change', e => handleLogoFile(e.target.files && e.target.files[0]));
+  ['dragenter','dragover'].forEach(ev => {
+    logoDropzone.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      logoDropzone.classList.add('is-dragover');
+    });
+  });
+  ['dragleave','drop'].forEach(ev => {
+    logoDropzone.addEventListener(ev, e => {
+      e.preventDefault(); e.stopPropagation();
+      logoDropzone.classList.remove('is-dragover');
+    });
+  });
+  logoDropzone.addEventListener('drop', e => {
+    const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+    if (f) handleLogoFile(f);
+  });
+
+  function buildLogoPayload() {
+    const url = logoPublicUrl.value.trim();
+    const hasFile = !!(state.logo && state.logo.dataUri);
+    const hasUrl = /^https:\/\//i.test(url);
+    if (!hasFile && !hasUrl) return null;
+    return {
+      dataUri: hasFile ? state.logo.dataUri : null,
+      mimeType: hasFile ? state.logo.mimeType : null,
+      alt: (document.getElementById('businessName').value || 'Logo').trim().slice(0, 120),
+      publicUrl: hasUrl ? url : null,
+    };
+  }
 
   // ---- Health check ----
   async function checkHealth() {
@@ -784,6 +1089,7 @@
     renderSeo(v.seo);
     renderVariantTabs();
     refinePanel.classList.add('show');
+    if (v.html && consultCta) consultCta.classList.add('show');
   }
 
   // ---- AI suggestions (debounced on description input) ----
@@ -912,6 +1218,7 @@
         abHeadline: abHeadline.checked,
         chatbot: chatbot.checked,
       },
+      logo: buildLogoPayload(),
     };
     state.lastPayload = payload;
 
@@ -984,6 +1291,101 @@
     { threshold: 0.08 }
   );
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ---- Consultation CTA wiring ----
+  const consultCta = document.getElementById('consultCta');
+  const consultHeadline = document.getElementById('consultHeadline');
+  const consultBody = document.getElementById('consultBody');
+  const consultBookLabel = document.getElementById('consultBookLabel');
+  const consultBookBtn = document.getElementById('consultBookBtn');
+  const consultDownloadBtn = document.getElementById('consultDownloadBtn');
+  const headerHelpBtn = document.getElementById('headerHelpBtn');
+
+  // A/B test variants for the consultation CTA copy.
+  // The chosen variant is sticky for the browser session so we don't churn copy as the user clicks around.
+  const CONSULT_VARIANTS = [
+    { key: 'a', headline: 'Love this website? Let’s make it even better.', body: 'Our team can customize this with your logo, add more pages, integrate e-commerce, optimize for SEO, and get you ranking on Google.', cta: 'Book Free 15-Min Consultation' },
+    { key: 'b', headline: 'Turn this into a $10K website for $2,500.', body: 'Get full customization, branded design, and professional SEO on top of what GENESIS just generated for you.', cta: 'See Customization Options' },
+    { key: 'c', headline: 'Limited spots: professional customization this month.', body: 'Our specialists can take this generated site and polish it into a launch-ready brand experience — fast.', cta: 'Claim Your Free Strategy Call' },
+    { key: 'd', headline: 'Join the businesses we’ve helped rank #1 on Google.', body: 'A free 15-minute call — we’ll review what GENESIS built for you and map out the next step.', cta: 'Book Your Free SEO Consultation' },
+  ];
+  function pickConsultVariant() {
+    try {
+      let key = localStorage.getItem('genesis_consult_variant');
+      if (!key) {
+        key = CONSULT_VARIANTS[Math.floor(Math.random() * CONSULT_VARIANTS.length)].key;
+        localStorage.setItem('genesis_consult_variant', key);
+      }
+      return CONSULT_VARIANTS.find(v => v.key === key) || CONSULT_VARIANTS[0];
+    } catch {
+      return CONSULT_VARIANTS[0];
+    }
+  }
+  const consultVariant = pickConsultVariant();
+  consultHeadline.textContent = consultVariant.headline;
+  consultBody.textContent = consultVariant.body;
+  consultBookLabel.textContent = consultVariant.cta;
+
+  // Resolve the configured consultation URL from the server (cached for the session).
+  let consultUrl = null;
+  async function getConsultUrl() {
+    if (consultUrl) return consultUrl;
+    try {
+      const r = await fetch('/api/consultation-config');
+      if (r.ok) {
+        const data = await r.json().catch(() => ({}));
+        if (data && typeof data.consultationUrl === 'string' && data.consultationUrl.length > 0) {
+          consultUrl = data.consultationUrl;
+        }
+      }
+    } catch {}
+    if (!consultUrl) consultUrl = 'https://adgorhythms-intake.up.railway.app';
+    return consultUrl;
+  }
+  function buildConsultLink(base) {
+    const params = new URLSearchParams({ source: 'genesis' });
+    const bname = (document.getElementById('businessName')?.value || '').trim();
+    const btype = (document.getElementById('businessType')?.value || '').trim();
+    const bloc = (document.getElementById('location')?.value || '').trim();
+    if (bname) params.set('businessName', bname);
+    if (btype) params.set('businessType', btype);
+    if (bloc) params.set('location', bloc);
+    params.set('variant', consultVariant.key);
+    const sep = base.includes('?') ? '&' : '?';
+    return `${base}${sep}${params.toString()}`;
+  }
+  async function openConsultation(origin) {
+    const url = await getConsultUrl();
+    // Backup: store generated-site context for same-origin pickup if the intake form ever moves into this domain.
+    try {
+      const v = state.variants[state.activeVariant];
+      const ctx = {
+        businessName: (document.getElementById('businessName')?.value || '').trim(),
+        businessType: (document.getElementById('businessType')?.value || '').trim(),
+        location: (document.getElementById('location')?.value || '').trim(),
+        description: (document.getElementById('description')?.value || '').trim(),
+        timestamp: new Date().toISOString(),
+        hasGeneratedSite: !!(v && v.html),
+        consultVariant: consultVariant.key,
+        source: origin || 'unknown',
+      };
+      localStorage.setItem('genesis-website-data', JSON.stringify(ctx));
+    } catch {}
+    // GA4 hook — no-op unless gtag is present (the builder doesn't load GA, but partners' downloads do).
+    try {
+      if (typeof window.gtag === 'function') {
+        window.gtag('event', 'consultation_clicked', {
+          event_category: 'engagement',
+          event_label: `genesis_builder_${consultVariant.key}_${origin || 'unknown'}`,
+          value: 2500,
+        });
+      }
+    } catch {}
+    window.open(buildConsultLink(url), '_blank', 'noopener');
+  }
+  consultBookBtn.addEventListener('click', () => openConsultation('after_generate'));
+  headerHelpBtn.addEventListener('click', () => openConsultation('header_help'));
+  consultDownloadBtn.addEventListener('click', () => downloadBtn.click());
 
   // ---- Service worker registration (best-effort, non-blocking) ----
   if ('serviceWorker' in navigator) {

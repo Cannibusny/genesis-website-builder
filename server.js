@@ -21,6 +21,10 @@ app.use(cookieParser());
 // ----- Shared password gate -----
 // Set BUILDER_PASSWORD env var to enable. If unset, the gate is OFF (open access).
 const BUILDER_PASSWORD = process.env.BUILDER_PASSWORD || '';
+
+// ----- Consultation intake URL (configurable; used by the after-generation CTA) -----
+const DEFAULT_CONSULTATION_URL = 'https://adgorhythms-intake.up.railway.app';
+const CONSULTATION_URL = (process.env.CONSULTATION_URL || DEFAULT_CONSULTATION_URL).trim();
 const COOKIE_NAME = 'genesis_auth';
 const COOKIE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 
@@ -39,9 +43,15 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'genesis-website-builder',
-    version: '2.2.0',
+    version: '2.3.0',
     passwordGate: !!BUILDER_PASSWORD,
   });
+});
+
+// Public endpoint: the configured consultation URL. Public so the login page or
+// unauthenticated marketing surfaces could surface the CTA without leaking secrets.
+app.get('/api/consultation-config', (req, res) => {
+  res.json({ consultationUrl: CONSULTATION_URL });
 });
 
 app.post('/api/login', (req, res) => {
@@ -94,8 +104,13 @@ app.use(
   })
 );
 
-// ----- Per-IP rate limit for the expensive generate endpoint -----
+// ----- Per-IP rate limits -----
+// Three independent limiters because the endpoints have very different cost profiles
+// and /api/suggest is auto-triggered while the user types.
 const GENERATE_LIMIT_PER_HOUR = parseInt(process.env.GENERATE_LIMIT_PER_HOUR || '5', 10);
+const SUGGEST_LIMIT_PER_HOUR = parseInt(process.env.SUGGEST_LIMIT_PER_HOUR || '40', 10);
+const REFINE_LIMIT_PER_HOUR = parseInt(process.env.REFINE_LIMIT_PER_HOUR || '15', 10);
+
 const generateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: GENERATE_LIMIT_PER_HOUR,
@@ -104,6 +119,30 @@ const generateLimiter = rateLimit({
   message: {
     success: false,
     error: `Rate limit reached (${GENERATE_LIMIT_PER_HOUR} generations per hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const suggestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: SUGGEST_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Suggestion limit reached (${SUGGEST_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const refineLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: REFINE_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Refinement limit reached (${REFINE_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
     rateLimited: true,
   },
 });
@@ -145,7 +184,7 @@ function isCannabisBusiness(businessType = '', description = '') {
 // ----- Per-industry design rules (injected into system prompt for sharper, on-brand output) -----
 function getIndustryRules(businessType = '', description = '') {
   const haystack = `${businessType} ${description}`.toLowerCase();
-  if (/\b(cannabis|dispensar|marijuana|hemp|cbd|thc)\b/.test(haystack)) {
+  if (/\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack)) {
     return `INDUSTRY: Cannabis / dispensary.
 - Palette: earth tones — deep forest green (#0f3d2e), muted gold (#c9a85b), warm cream (#f4ecd8), charcoal text.
 - Visuals: organic, botanical, premium craft vibe. Inline SVG leaf accents OK. NO consumption imagery, NO appeals to minors.
@@ -235,6 +274,7 @@ function buildSystemPrompt({
   description,
   conversion,
   refinementInstructions,
+  logo,
 }) {
   const cannabis = compliance?.ageGate || isCannabisBusiness(businessType, description);
   const themePalette = getTheme(theme);
@@ -356,7 +396,12 @@ Add a floating chat button bottom-right with id="chat-toggle" that opens a panel
 Do NOT include any real API key.\n`
     : ''
 }
-${variantHint ? `# VARIANT GUIDANCE\n${variantHint}\n` : ''}
+${
+  logo
+    ? `# CLIENT-PROVIDED LOGO (REQUIRED)
+The partner uploaded a brand logo. In the <header>, render an <img id="brand-logo" alt="${(logo.alt || 'Logo').replace(/"/g, '\\"')}" src="" /> as the FIRST child of the header (before the wordmark / nav). Leave the src ATTRIBUTE EMPTY — the server will inject the real image bytes after generation. Size the logo at about 36–44px tall in the header (no fixed width). Do NOT include the wordmark text adjacent to the logo if the logo already contains a wordmark glyph; instead use a small <span class="brand-name"> with the business name to the right of the logo for accessibility, optionally hidden visually if the logo is wordmark-only.\n`
+    : ''
+}${variantHint ? `# VARIANT GUIDANCE\n${variantHint}\n` : ''}
 ${
   refinementInstructions
     ? `# REFINEMENT INSTRUCTIONS (apply on top of the design system, not replacing it)
@@ -400,6 +445,114 @@ function stripCodeFences(text) {
   const fenceMatch = trimmed.match(/^```(?:html)?\s*\n([\s\S]*?)\n```\s*$/i);
   if (fenceMatch) return fenceMatch[1].trim();
   return trimmed;
+}
+
+// ----- Validate + normalize a logo payload from the client -----
+// Accepts { dataUri, mimeType, alt, publicUrl } and returns a sanitized object,
+// or null if the input is missing/invalid.
+const ALLOWED_LOGO_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/svg+xml',
+  'image/gif',
+]);
+const MAX_LOGO_BYTES = 200 * 1024; // 200KB of base64 (~150KB raw)
+
+function sanitizeLogo(logo, businessName) {
+  if (!logo || typeof logo !== 'object') return null;
+  let { dataUri, mimeType, alt, publicUrl } = logo;
+
+  // Accept either a data URI or a public URL (or both).
+  let validDataUri = null;
+  if (typeof dataUri === 'string' && dataUri.startsWith('data:')) {
+    const m = dataUri.match(/^data:([a-z0-9.+\-]+\/[a-z0-9.+\-]+);base64,([A-Za-z0-9+/=\s]+)$/i);
+    if (m) {
+      const mt = m[1].toLowerCase();
+      if (ALLOWED_LOGO_MIME_TYPES.has(mt) && dataUri.length <= MAX_LOGO_BYTES * 1.4) {
+        validDataUri = dataUri.replace(/\s+/g, '');
+        mimeType = mt;
+      }
+    }
+  }
+
+  let validPublicUrl = null;
+  if (typeof publicUrl === 'string') {
+    const trimmed = publicUrl.trim();
+    if (/^https:\/\/[^\s"'<>]{4,2000}$/i.test(trimmed)) {
+      validPublicUrl = trimmed;
+    }
+  }
+
+  if (!validDataUri && !validPublicUrl) return null;
+
+  const safeAlt = (typeof alt === 'string' && alt.trim() ? alt.trim() : (businessName || 'Logo')).slice(0, 120);
+  return {
+    dataUri: validDataUri,
+    mimeType: mimeType || null,
+    alt: safeAlt,
+    publicUrl: validPublicUrl,
+  };
+}
+
+// ----- Inject the validated logo into the generated HTML -----
+// Strategy: prefer a <img id="brand-logo"> placeholder Claude was instructed to emit;
+// if missing, insert one at the top of the first <header>. Also injects favicon
+// <link rel="icon"> and (when a public URL is provided) ensures the og:image meta uses it.
+function injectLogo(html, logo) {
+  if (!html || !logo) return html;
+  const src = logo.dataUri || logo.publicUrl;
+  if (!src) return html;
+  const alt = (logo.alt || '').replace(/"/g, '&quot;');
+
+  let out = html;
+  const imgTag = `<img id="brand-logo" src="${src}" alt="${alt}" style="display:inline-block;height:36px;width:auto;max-width:200px;vertical-align:middle;" />`;
+
+  // NOTE: All .replace() calls below MUST use function-replacements (not string-replacements).
+  // The replacement strings include user-supplied URLs, and String.prototype.replace
+  // interprets $&, $`, $', $$, and $n inside string replacements as special patterns.
+  // Function replacements return literal strings and are immune to that interpretation.
+
+  // 1. Replace placeholder <img id="brand-logo" ...> if Claude emitted one.
+  const placeholderRe = /<img\b[^>]*\bid=["']brand-logo["'][^>]*\/?>/i;
+  if (placeholderRe.test(out)) {
+    out = out.replace(placeholderRe, () => imgTag);
+  } else {
+    // 2. Otherwise, inject right inside the first <header ...>.
+    const headerOpenRe = /(<header\b[^>]*>)/i;
+    if (headerOpenRe.test(out)) {
+      out = out.replace(headerOpenRe, (m) => `${m}\n  ${imgTag}`);
+    } else {
+      // 3. Last resort: prepend to <body>.
+      out = out.replace(/<body\b[^>]*>/i, (match) => `${match}\n${imgTag}`);
+    }
+  }
+
+  // 4. Favicon: add <link rel="icon" ...> in <head> if not already present.
+  if (!/<link[^>]+rel=["'](?:icon|shortcut icon)["']/i.test(out)) {
+    const faviconTag = `<link rel="icon" type="${logo.mimeType || 'image/png'}" href="${src}" />`;
+    out = out.replace(/<\/head>/i, () => `  ${faviconTag}\n</head>`);
+  }
+
+  // 5. og:image: prefer publicUrl; data URIs are not valid for og:image.
+  if (logo.publicUrl) {
+    const ogTag = `<meta property="og:image" content="${logo.publicUrl}" />`;
+    if (/<meta[^>]+property=["']og:image["']/i.test(out)) {
+      out = out.replace(/<meta[^>]+property=["']og:image["'][^>]*>/i, () => ogTag);
+    } else {
+      out = out.replace(/<\/head>/i, () => `  ${ogTag}\n</head>`);
+    }
+    // Twitter card image too.
+    const twTag = `<meta name="twitter:image" content="${logo.publicUrl}" />`;
+    if (/<meta[^>]+name=["']twitter:image["']/i.test(out)) {
+      out = out.replace(/<meta[^>]+name=["']twitter:image["'][^>]*>/i, () => twTag);
+    } else {
+      out = out.replace(/<\/head>/i, () => `  ${twTag}\n</head>`);
+    }
+  }
+
+  return out;
 }
 
 // ----- Inject GA4 + Meta Pixel snippets into generated HTML -----
@@ -578,6 +731,7 @@ async function generateOne(client, opts) {
     conversion,
     refinementInstructions,
     sourceHtml,
+    logo,
   } = opts;
 
   const systemPrompt = buildSystemPrompt({
@@ -589,6 +743,7 @@ async function generateOne(client, opts) {
     description,
     conversion,
     refinementInstructions,
+    logo,
   });
 
   const userPrompt = sourceHtml
@@ -621,6 +776,7 @@ Build the entire single-file HTML now.`;
 
   const textBlock = response.content.find(b => b.type === 'text');
   let html = stripCodeFences(textBlock ? textBlock.text : '');
+  html = injectLogo(html, logo);
   html = injectAnalytics(html, analytics);
   const seo = scoreSeo(html);
 
@@ -656,6 +812,7 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
     const client = new Anthropic({ apiKey });
     const count = Math.max(1, Math.min(3, parseInt(variantCount, 10) || 1));
     const conversion = body.conversion || {};
+    const logo = sanitizeLogo(body.logo, businessName);
 
     // If only one variant, no variant hint. If multiple, pass the variant prompts.
     const variants = await Promise.all(
@@ -669,6 +826,7 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
           compliance,
           analytics,
           conversion,
+          logo,
           variantHint: count > 1 ? VARIANT_HINTS[i] : null,
         }).then(result => ({
           ...result,
@@ -688,6 +846,7 @@ app.post('/api/generate', generateLimiter, async (req, res) => {
         count,
         cannabis: isCannabisBusiness(businessType, description) || !!compliance?.ageGate,
         analyticsInjected: !!(analytics?.ga4 || analytics?.metaPixel || analytics?.hotjar),
+        logoInjected: !!logo,
       },
     });
   } catch (error) {
@@ -716,7 +875,7 @@ app.get('/api/variants', (req, res) => {
 });
 
 // ----- AI Suggestions: analyze the description and surface 3 actionable improvements -----
-app.post('/api/suggest', generateLimiter, async (req, res) => {
+app.post('/api/suggest', suggestLimiter, async (req, res) => {
   try {
     const { description = '', businessType = '', location = '' } = req.body || {};
     if (description.trim().length < 30) {
@@ -776,7 +935,7 @@ const REFINEMENT_INSTRUCTIONS = {
 };
 const REFINEMENT_KEYS = Object.keys(REFINEMENT_INSTRUCTIONS);
 
-app.post('/api/refine', generateLimiter, async (req, res) => {
+app.post('/api/refine', refineLimiter, async (req, res) => {
   try {
     const body = req.body || {};
     const {
@@ -812,6 +971,8 @@ app.post('/api/refine', generateLimiter, async (req, res) => {
     if (!apiKey) return res.status(500).json({ success: false, error: 'ANTHROPIC_API_KEY not configured' });
     const client = new Anthropic({ apiKey });
 
+    const logo = sanitizeLogo(body.logo, businessName);
+
     const result = await generateOne(client, {
       businessType,
       businessName,
@@ -821,6 +982,7 @@ app.post('/api/refine', generateLimiter, async (req, res) => {
       compliance,
       analytics,
       conversion: conversion || {},
+      logo,
       variantHint: variantHint || null,
       refinementInstructions: lines.join('\n'),
       sourceHtml,
@@ -832,6 +994,7 @@ app.post('/api/refine', generateLimiter, async (req, res) => {
       seo: result.seo,
       applied: selectedKeys,
       customInstruction: customInstruction || null,
+      logoInjected: !!logo,
     });
   } catch (error) {
     console.error('Refine error:', error);
@@ -841,7 +1004,7 @@ app.post('/api/refine', generateLimiter, async (req, res) => {
 
 app.listen(PORT, () => {
   console.log(
-    `GENESIS Website Builder v2.2 running on port ${PORT} (password gate ${
+    `GENESIS Website Builder v2.3 running on port ${PORT} (password gate ${
       BUILDER_PASSWORD ? 'ON' : 'OFF'
     }, generate limit ${GENERATE_LIMIT_PER_HOUR}/hr per IP)`
   );
