@@ -425,6 +425,21 @@
     box-shadow: 0 14px 38px rgba(124, 92, 255, 0.18);
   }
   .consult-cta.show { display: block; }
+  .consult-cta .brand {
+    display: flex; align-items: center; gap: 10px;
+    margin: 0 0 12px;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.4px;
+    color: rgba(255, 255, 255, 0.78);
+    font-weight: 600;
+  }
+  .consult-cta .brand img {
+    width: 36px; height: 36px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 4px;
+    flex: 0 0 36px;
+  }
   .consult-cta h3 {
     margin: 0 0 6px;
     font-size: 20px;
@@ -771,6 +786,10 @@
         </div>
 
         <div class="consult-cta" id="consultCta" aria-live="polite">
+          <div class="brand">
+            <img src="/assets/adgorhythms-logo.webp" alt="ADgorhythms" />
+            <span>Powered by ADgorhythms</span>
+          </div>
           <h3 id="consultHeadline">Love this website? Let’s make it even better.</h3>
           <p id="consultBody">Our team can customize this with your logo, add more pages, integrate e-commerce, optimize for SEO, and get you ranking on Google.</p>
           <div class="actions">
