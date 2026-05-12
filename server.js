@@ -94,8 +94,13 @@ app.use(
   })
 );
 
-// ----- Per-IP rate limit for the expensive generate endpoint -----
+// ----- Per-IP rate limits -----
+// Three independent limiters because the endpoints have very different cost profiles
+// and /api/suggest is auto-triggered while the user types.
 const GENERATE_LIMIT_PER_HOUR = parseInt(process.env.GENERATE_LIMIT_PER_HOUR || '5', 10);
+const SUGGEST_LIMIT_PER_HOUR = parseInt(process.env.SUGGEST_LIMIT_PER_HOUR || '40', 10);
+const REFINE_LIMIT_PER_HOUR = parseInt(process.env.REFINE_LIMIT_PER_HOUR || '15', 10);
+
 const generateLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: GENERATE_LIMIT_PER_HOUR,
@@ -104,6 +109,30 @@ const generateLimiter = rateLimit({
   message: {
     success: false,
     error: `Rate limit reached (${GENERATE_LIMIT_PER_HOUR} generations per hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const suggestLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: SUGGEST_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Suggestion limit reached (${SUGGEST_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
+    rateLimited: true,
+  },
+});
+
+const refineLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: REFINE_LIMIT_PER_HOUR,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: {
+    success: false,
+    error: `Refinement limit reached (${REFINE_LIMIT_PER_HOUR}/hour per IP). Try again later.`,
     rateLimited: true,
   },
 });
@@ -145,7 +174,7 @@ function isCannabisBusiness(businessType = '', description = '') {
 // ----- Per-industry design rules (injected into system prompt for sharper, on-brand output) -----
 function getIndustryRules(businessType = '', description = '') {
   const haystack = `${businessType} ${description}`.toLowerCase();
-  if (/\b(cannabis|dispensar|marijuana|hemp|cbd|thc)\b/.test(haystack)) {
+  if (/\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack)) {
     return `INDUSTRY: Cannabis / dispensary.
 - Palette: earth tones — deep forest green (#0f3d2e), muted gold (#c9a85b), warm cream (#f4ecd8), charcoal text.
 - Visuals: organic, botanical, premium craft vibe. Inline SVG leaf accents OK. NO consumption imagery, NO appeals to minors.
@@ -716,7 +745,7 @@ app.get('/api/variants', (req, res) => {
 });
 
 // ----- AI Suggestions: analyze the description and surface 3 actionable improvements -----
-app.post('/api/suggest', generateLimiter, async (req, res) => {
+app.post('/api/suggest', suggestLimiter, async (req, res) => {
   try {
     const { description = '', businessType = '', location = '' } = req.body || {};
     if (description.trim().length < 30) {
@@ -776,7 +805,7 @@ const REFINEMENT_INSTRUCTIONS = {
 };
 const REFINEMENT_KEYS = Object.keys(REFINEMENT_INSTRUCTIONS);
 
-app.post('/api/refine', generateLimiter, async (req, res) => {
+app.post('/api/refine', refineLimiter, async (req, res) => {
   try {
     const body = req.body || {};
     const {
