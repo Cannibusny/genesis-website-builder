@@ -1,7 +1,7 @@
 {
   "name": "genesis-website-builder",
-  "version": "1.0.0",
-  "description": "AI-Powered Website Builder",
+  "version": "2.2.0",
+  "description": "AI-Powered Website Builder with named variants (Professional/Modern/Premium), industry-specific design rules, AI suggestions, AI refinement, Hotjar injection, exit-intent + A/B test + chatbot framework in generated sites, SEO scoring, cannabis compliance, password gate, and per-IP rate limiting",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
     "express": "^4.21.2",
-    "cors": "^2.8.5"
+    "express-rate-limit": "^7.4.1"
   }
 }

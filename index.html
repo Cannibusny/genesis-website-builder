@@ -3,221 +3,387 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>GENESIS Website Builder</title>
+<title>GENESIS Website Builder · v2.2</title>
+<meta name="description" content="AI-powered website builder by GENESIS. Generate production-grade marketing sites with named variants (Professional / Modern / Premium), industry-specific design rules, AI refinement, and built-in SEO scoring." />
 <style>
   :root {
-    --bg: #0b0d12;
+    --bg: #07080c;
+    --bg-2: #0b0d12;
     --panel: #11141b;
     --panel-2: #161a23;
     --border: #1f2430;
+    --border-2: #2a3142;
     --text: #e8ecf3;
     --muted: #8a92a6;
     --accent: #7c5cff;
     --accent-2: #22d3ee;
     --danger: #ef4444;
     --ok: #22c55e;
+    --warn: #f59e0b;
   }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    background: radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,0.12), transparent 60%),
-                radial-gradient(900px 500px at -10% 110%, rgba(34,211,238,0.10), transparent 60%),
-                var(--bg);
+    background:
+      radial-gradient(1400px 700px at 80% -10%, rgba(124, 92, 255, 0.16), transparent 60%),
+      radial-gradient(1100px 600px at -10% 110%, rgba(34, 211, 238, 0.13), transparent 60%),
+      radial-gradient(700px 400px at 50% 50%, rgba(124, 92, 255, 0.04), transparent 70%),
+      var(--bg);
     color: var(--text);
     -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
   }
-  header {
-    padding: 18px 24px;
+
+  /* ----- Header ----- */
+  header.app-header {
+    padding: 16px 24px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    background: rgba(11,13,18,0.6);
-    backdrop-filter: blur(8px);
+    background: rgba(7, 8, 12, 0.7);
+    backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 50;
   }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-  }
+  .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: 0.4px; }
   .brand .logo {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
+    width: 28px; height: 28px; border-radius: 8px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    box-shadow: 0 8px 24px rgba(124,92,255,0.35);
+    box-shadow: 0 8px 24px rgba(124, 92, 255, 0.45);
+    position: relative;
   }
-  .brand .name { font-size: 14px; text-transform: uppercase; }
+  .brand .logo::after {
+    content: ""; position: absolute; inset: 4px; border-radius: 5px;
+    background: rgba(7, 8, 12, 0.6);
+    backdrop-filter: blur(4px);
+  }
+  .brand .name { font-size: 13px; text-transform: uppercase; }
   .brand .name span { color: var(--accent-2); }
-  .health {
-    display: inline-flex; align-items: center; gap: 8px;
-    font-size: 12px; color: var(--muted);
+  .brand .pill {
+    font-size: 10px; padding: 3px 8px; border-radius: 999px;
+    background: linear-gradient(135deg, rgba(124,92,255,0.25), rgba(34,211,238,0.2));
+    border: 1px solid rgba(124, 92, 255, 0.4); color: #cdd4ea; margin-left: 6px;
+    letter-spacing: 0.6px;
   }
+  .health { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
   .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--muted); }
   .dot.ok { background: var(--ok); box-shadow: 0 0 12px var(--ok); }
   .dot.err { background: var(--danger); box-shadow: 0 0 12px var(--danger); }
 
+  /* ----- Layout ----- */
   main {
-    max-width: 1280px;
+    max-width: 1480px;
     margin: 0 auto;
-    padding: 32px 24px 64px;
+    padding: 24px 24px 64px;
     display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 24px;
+    grid-template-columns: 420px 1fr;
+    gap: 20px;
   }
-  @media (max-width: 960px) {
-    main { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 1024px) { main { grid-template-columns: 1fr; } }
 
   .panel {
     background: linear-gradient(180deg, var(--panel), var(--panel-2));
     border: 1px solid var(--border);
     border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+    box-shadow: 0 14px 50px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
   }
-  .panel h2 {
-    margin: 0;
-    padding: 18px 20px;
+  .panel-head {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 16px 20px;
     border-bottom: 1px solid var(--border);
-    font-size: 14px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: var(--muted);
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted);
   }
-  form { padding: 20px; display: flex; flex-direction: column; gap: 14px; }
-  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
+  .panel-head .right { display: flex; gap: 8px; align-items: center; }
+
+  form { padding: 16px 20px 20px; display: flex; flex-direction: column; gap: 12px; }
+  label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.8px; }
   input, textarea, select {
     width: 100%;
     background: #0d1018;
     border: 1px solid var(--border);
     color: var(--text);
     border-radius: 10px;
-    padding: 12px 14px;
-    font-size: 14px;
+    padding: 10px 12px;
+    font-size: 13.5px;
     outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
     font-family: inherit;
   }
   input:focus, textarea:focus, select:focus {
     border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(124,92,255,0.18);
+    box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.18);
   }
-  textarea { min-height: 110px; resize: vertical; }
+  textarea { min-height: 88px; resize: vertical; line-height: 1.45; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .field { display: flex; flex-direction: column; gap: 5px; }
 
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-  .field { display: flex; flex-direction: column; gap: 6px; }
+  /* Collapsible "advanced" sections */
+  details.section {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+    margin-top: 4px;
+  }
+  details.section > summary {
+    cursor: pointer; list-style: none;
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--muted);
+    padding: 4px 0;
+    user-select: none;
+  }
+  details.section > summary::-webkit-details-marker { display: none; }
+  details.section > summary::after {
+    content: "+"; font-size: 14px; color: var(--muted); transition: transform 0.2s ease;
+  }
+  details.section[open] > summary::after { content: "−"; }
+  details.section > .body { padding-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+
+  /* Theme & variant swatches */
+  .swatches { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+  .swatch {
+    cursor: pointer; padding: 8px; border: 1px solid var(--border); border-radius: 10px;
+    background: #0d1018; transition: transform 0.05s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+    text-align: center; font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
+  }
+  .swatch .preview {
+    width: 100%; height: 36px; border-radius: 6px;
+    border: 1px solid var(--border-2);
+  }
+  .swatch.is-selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgba(124, 92, 255, 0.25);
+    color: var(--text);
+  }
+  .swatch input[type="radio"] { position: absolute; opacity: 0; pointer-events: none; }
+
+  .preview-obsidian { background: radial-gradient(60% 80% at 30% 30%, rgba(124,92,255,0.6), transparent 70%), radial-gradient(60% 80% at 70% 70%, rgba(34,211,238,0.5), transparent 70%), #0b0d12; }
+  .preview-porcelain { background: radial-gradient(60% 80% at 30% 30%, rgba(168,123,63,0.4), transparent 70%), #f8f5ef; }
+  .preview-cannabis { background: radial-gradient(60% 80% at 30% 30%, rgba(201,168,91,0.45), transparent 70%), #0f3d2e; }
+  .preview-default { background: linear-gradient(135deg, #2b2f3a, #565d72); }
+
+  .variant-toggle { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .vt {
+    cursor: pointer; padding: 9px 8px; border: 1px solid var(--border); border-radius: 10px;
+    background: #0d1018; font-size: 12px; color: var(--muted); text-align: center;
+    transition: all 0.15s ease;
+  }
+  .vt.is-selected { background: linear-gradient(135deg, rgba(124,92,255,0.25), rgba(34,211,238,0.18)); color: var(--text); border-color: var(--accent); }
 
   button.primary {
-    appearance: none;
-    border: 0;
-    cursor: pointer;
-    color: white;
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.3px;
-    padding: 12px 16px;
-    border-radius: 10px;
+    appearance: none; border: 0; cursor: pointer;
+    color: white; font-weight: 600; font-size: 14px; letter-spacing: 0.3px;
+    padding: 12px 16px; border-radius: 10px;
     background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    box-shadow: 0 10px 30px rgba(124,92,255,0.35);
-    transition: transform 0.05s ease, opacity 0.15s ease;
+    box-shadow: 0 12px 32px rgba(124, 92, 255, 0.35);
+    transition: transform 0.06s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    position: relative; overflow: hidden;
   }
-  button.primary:hover { transform: translateY(-1px); }
-  button.primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  button.primary:hover { transform: translateY(-1px); box-shadow: 0 18px 40px rgba(124, 92, 255, 0.4); }
+  button.primary:active { transform: scale(0.98); }
+  button.primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; box-shadow: none; }
+  .actions { display: flex; gap: 10px; align-items: center; justify-content: space-between; margin-top: 4px; }
+  .hint { font-size: 11.5px; color: var(--muted); }
 
-  .actions { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
-  .hint { font-size: 12px; color: var(--muted); }
-
-  .preview-head {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 14px 18px;
-    border-bottom: 1px solid var(--border);
+  /* ----- Preview panel ----- */
+  .preview-head .tabs { display: flex; gap: 4px; }
+  .tab {
+    cursor: pointer; padding: 6px 10px; border-radius: 8px; border: 1px solid var(--border);
+    background: #0d1018; font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px;
+    transition: all 0.15s ease;
   }
-  .preview-head .title { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); }
-  .preview-head .controls { display: flex; gap: 8px; }
+  .tab.is-active { background: linear-gradient(135deg, rgba(124,92,255,0.25), rgba(34,211,238,0.18)); color: var(--text); border-color: var(--accent); }
+  .tab.is-active .score-pill { background: rgba(255,255,255,0.18); }
+  .score-pill {
+    display: inline-block; margin-left: 6px; padding: 1px 6px; border-radius: 999px;
+    font-size: 10px; background: rgba(255,255,255,0.08); color: var(--text);
+  }
+
   .ctl {
-    appearance: none;
-    border: 1px solid var(--border);
-    background: #0d1018;
-    color: var(--text);
-    border-radius: 8px;
-    padding: 8px 12px;
-    font-size: 12px;
-    cursor: pointer;
+    appearance: none; border: 1px solid var(--border); background: #0d1018; color: var(--text);
+    border-radius: 8px; padding: 7px 11px; font-size: 12px; cursor: pointer;
+    transition: border-color 0.15s ease, transform 0.05s ease;
   }
   .ctl:hover { border-color: var(--accent); }
-  .preview-body {
-    height: calc(100vh - 280px);
-    min-height: 520px;
-    background: #0a0c12;
-    border-bottom-left-radius: 16px;
-    border-bottom-right-radius: 16px;
-    overflow: hidden;
+  .ctl:active { transform: scale(0.98); }
+  .ctl:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .preview-area {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    min-height: calc(100vh - 240px);
+  }
+  @media (max-width: 1200px) { .preview-area { grid-template-columns: 1fr; } }
+
+  .preview-frame {
     position: relative;
+    background: #0a0c12;
+    border-right: 1px solid var(--border);
+    min-height: 560px;
   }
-  iframe {
-    width: 100%;
-    height: 100%;
-    border: 0;
-    background: white;
-  }
+  iframe { width: 100%; height: 100%; border: 0; background: white; min-height: 560px; }
+
   .placeholder {
     position: absolute; inset: 0;
     display: flex; align-items: center; justify-content: center;
     color: var(--muted); font-size: 14px; text-align: center; padding: 24px;
   }
   .placeholder .pad {
-    max-width: 380px;
-    border: 1px dashed var(--border);
-    padding: 24px;
-    border-radius: 12px;
-    background: rgba(255,255,255,0.02);
+    max-width: 420px; border: 1px dashed var(--border-2);
+    padding: 28px; border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
   }
+  .placeholder .pad h3 { margin: 0 0 8px; color: var(--text); font-size: 16px; letter-spacing: 0.3px; }
+  .placeholder .pad p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+
   .loading {
-    position: absolute; inset: 0;
-    display: none;
+    position: absolute; inset: 0; display: none;
     align-items: center; justify-content: center;
-    background: rgba(10,12,18,0.6);
-    backdrop-filter: blur(2px);
-    z-index: 2;
-    color: var(--text);
-    font-size: 14px;
+    background: rgba(10, 12, 18, 0.75); backdrop-filter: blur(4px);
+    z-index: 3; color: var(--text); font-size: 14px;
+    flex-direction: column; gap: 14px;
   }
   .loading.show { display: flex; }
   .spinner {
-    width: 18px; height: 18px;
-    border-radius: 50%;
-    border: 2px solid rgba(255,255,255,0.2);
+    width: 26px; height: 26px; border-radius: 50%;
+    border: 2.5px solid rgba(255, 255, 255, 0.2);
     border-top-color: var(--accent-2);
     animation: spin 0.8s linear infinite;
-    margin-right: 10px;
   }
+  .loading .status { color: var(--muted); font-size: 12.5px; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .error {
-    margin: 0 20px 20px;
-    padding: 12px 14px;
-    background: rgba(239,68,68,0.08);
-    border: 1px solid rgba(239,68,68,0.35);
-    color: #fecaca;
-    border-radius: 10px;
-    font-size: 13px;
+    margin: 0 20px 16px; padding: 12px 14px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #fecaca; border-radius: 10px; font-size: 13px;
     display: none;
   }
   .error.show { display: block; }
+
+  /* ----- SEO sidebar ----- */
+  .seo-panel { padding: 18px 18px 22px; overflow-y: auto; max-height: calc(100vh - 240px); }
+  .seo-panel h3 {
+    margin: 0 0 10px; font-size: 11.5px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted);
+  }
+  .seo-score {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .seo-score .big {
+    font-size: 36px; font-weight: 700; letter-spacing: 0.5px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .seo-score .meta { text-align: right; font-size: 12px; color: var(--muted); }
+  .seo-score .grade {
+    font-size: 22px; font-weight: 700; color: var(--text);
+    padding: 4px 10px; border-radius: 8px; background: rgba(255,255,255,0.04);
+    display: inline-block;
+  }
+
+  .check-list { display: flex; flex-direction: column; gap: 6px; }
+  .check { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.4; }
+  .check .mark { width: 16px; height: 16px; border-radius: 50%; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 10px; margin-top: 2px; }
+  .check.passed .mark { background: rgba(34, 197, 94, 0.15); color: var(--ok); }
+  .check.failed .mark { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+  .check.passed { color: var(--text); }
+  .check.failed { color: var(--muted); }
+
+  .rec-list { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+  .rec { font-size: 12.5px; line-height: 1.45; color: #fde68a; padding: 8px 10px; border: 1px solid rgba(245,158,11,0.25); border-radius: 8px; background: rgba(245,158,11,0.06); }
+
+  /* ----- AI suggestions bubble (below description) ----- */
+  .suggest-box {
+    margin-top: 8px;
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    background: rgba(34, 211, 238, 0.06);
+    color: #d3f4ff;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    display: none;
+  }
+  .suggest-box.show { display: block; }
+  .suggest-box .head {
+    display: flex; align-items: center; gap: 6px;
+    font-weight: 600; color: var(--accent-2); margin-bottom: 6px;
+  }
+  .suggest-box ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  .suggest-box.loading .head::after { content: "…"; }
+
+  /* ----- Refinement panel ----- */
+  .refine-panel {
+    margin-top: 14px;
+    border: 1px solid var(--border-2);
+    border-radius: 12px;
+    padding: 14px 14px 12px;
+    background: rgba(255, 255, 255, 0.015);
+    display: none;
+  }
+  .refine-panel.show { display: block; }
+  .refine-panel h4 {
+    margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+  }
+  .refine-panel .lead {
+    font-size: 12.5px; color: var(--text); margin: 0 0 10px;
+  }
+  .refine-grid {
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px 12px; margin-bottom: 8px;
+  }
+  @media (max-width: 1200px) { .refine-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 640px) { .refine-grid { grid-template-columns: 1fr; } }
+  .refine-col h5 {
+    margin: 6px 0 4px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.8px; color: var(--muted);
+  }
+  .refine-grid label {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: var(--text); text-transform: none; letter-spacing: normal;
+    padding: 3px 0; cursor: pointer;
+  }
+  .refine-grid input[type="checkbox"] { width: auto; accent-color: var(--accent); }
+  .refine-actions { display: flex; gap: 8px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .refine-actions input.custom {
+    flex: 1 1 240px; min-width: 200px;
+    background: #0d1018; border: 1px solid var(--border); color: var(--text);
+    border-radius: 8px; padding: 8px 10px; font-size: 12.5px;
+  }
+  .refine-actions .ctl.apply {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: white; border: 0; font-weight: 600;
+  }
+  .refine-actions .ctl.apply:hover { opacity: 0.95; }
+
+  .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin: 18px 0 8px; }
+
+  /* ----- Footer attribution ----- */
+  .attr { text-align: center; padding: 14px; color: var(--muted); font-size: 11px; }
+  .attr a { color: inherit; }
+
+  /* Animate cards in */
+  .reveal { opacity: 0; transform: translateY(8px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .reveal.is-visible { opacity: 1; transform: translateY(0); }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; }
+  }
 </style>
 </head>
 <body>
-<header>
+<header class="app-header">
   <div class="brand">
     <div class="logo"></div>
-    <div class="name">GENESIS<span>·</span>Website Builder</div>
+    <div class="name">GENESIS<span>·</span>Website Builder<span class="pill">v2.2</span></div>
   </div>
   <div class="health" id="health">
     <span class="dot" id="healthDot"></span>
@@ -226,17 +392,36 @@
 </header>
 
 <main>
-  <section class="panel">
-    <h2>Business Details</h2>
+  <section class="panel reveal">
+    <div class="panel-head">
+      <span>Brief</span>
+      <span class="hint">Powered by Claude Sonnet 4.5</span>
+    </div>
     <form id="builderForm">
       <div class="field">
-        <label for="businessName">Business Name</label>
+        <label for="businessName">Business name</label>
         <input id="businessName" name="businessName" placeholder="e.g. Aurora Coffee Co." required />
       </div>
       <div class="row">
         <div class="field">
           <label for="businessType">Type</label>
-          <input id="businessType" name="businessType" placeholder="e.g. Cafe & Roastery" required />
+          <select id="businessType" name="businessType" required>
+            <option value="" disabled selected>Select…</option>
+            <option>Cafe / Coffee Shop</option>
+            <option>Restaurant</option>
+            <option>Bar / Cocktail Lounge</option>
+            <option>Boutique / Retail</option>
+            <option>Salon / Spa</option>
+            <option>Fitness / Gym</option>
+            <option>Real Estate</option>
+            <option>Law Firm</option>
+            <option>Consulting Agency</option>
+            <option>SaaS / Tech Startup</option>
+            <option>Cannabis Dispensary</option>
+            <option>CBD / Hemp Shop</option>
+            <option>Smoke Shop / Vape</option>
+            <option>Other (specify in description)</option>
+          </select>
         </div>
         <div class="field">
           <label for="location">Location</label>
@@ -246,56 +431,258 @@
       <div class="field">
         <label for="description">Description</label>
         <textarea id="description" name="description" placeholder="What makes the business unique? Audience, vibe, signature offerings…" required></textarea>
+        <div id="suggestBox" class="suggest-box" aria-live="polite">
+          <div class="head">AI Suggestions</div>
+          <ul id="suggestList"></ul>
+        </div>
       </div>
+
+      <details class="section" id="themeSection" open>
+        <summary>Theme</summary>
+        <div class="body">
+          <div class="swatches" id="swatches">
+            <label class="swatch is-selected" data-theme="obsidian">
+              <span class="preview preview-obsidian"></span>
+              <input type="radio" name="theme" value="obsidian" checked />
+              Obsidian
+            </label>
+            <label class="swatch" data-theme="porcelain">
+              <span class="preview preview-porcelain"></span>
+              <input type="radio" name="theme" value="porcelain" />
+              Porcelain
+            </label>
+            <label class="swatch" data-theme="cannabis">
+              <span class="preview preview-cannabis"></span>
+              <input type="radio" name="theme" value="cannabis" />
+              Cannabis
+            </label>
+            <label class="swatch" data-theme="default">
+              <span class="preview preview-default"></span>
+              <input type="radio" name="theme" value="default" />
+              Studio
+            </label>
+          </div>
+        </div>
+      </details>
+
+      <details class="section" id="variantSection">
+        <summary>Design Variants</summary>
+        <div class="body">
+          <div class="variant-toggle" id="variantToggle" role="radiogroup" aria-label="Variant count">
+            <div class="vt is-selected" data-count="1">1 variant</div>
+            <div class="vt" data-count="2">2 variants</div>
+            <div class="vt" data-count="3">3 variants</div>
+          </div>
+          <p class="hint">Multiple variants generate distinct creative directions — <strong>Professional</strong> (trust, navy + serif), <strong>Modern</strong> (bold, high contrast), <strong>Premium</strong> (black + gold luxury). Compare them in the preview tabs.</p>
+        </div>
+      </details>
+
+      <details class="section" id="conversionSection">
+        <summary>Conversion Tools (in generated sites)</summary>
+        <div class="body">
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="exitIntent" style="width:auto;" checked />
+            <span>Exit-intent email capture popup</span>
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="abHeadline" style="width:auto;" />
+            <span>Built-in A/B headline test (random per visitor, localStorage)</span>
+          </label>
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="chatbot" style="width:auto;" />
+            <span>Chatbot framework (partner adds Anthropic key to activate)</span>
+          </label>
+          <p class="hint">These are added to the generated site, not the builder app.</p>
+        </div>
+      </details>
+
+      <details class="section" id="analyticsSection">
+        <summary>Analytics</summary>
+        <div class="body">
+          <div class="field">
+            <label for="ga4">Google Analytics 4 (Measurement ID)</label>
+            <input id="ga4" name="ga4" placeholder="G-XXXXXXXXXX" pattern="G-[A-Z0-9]{4,}" />
+          </div>
+          <div class="field">
+            <label for="metaPixel">Meta Pixel ID</label>
+            <input id="metaPixel" name="metaPixel" placeholder="1234567890123456" inputmode="numeric" pattern="\d{6,}" />
+          </div>
+          <div class="field">
+            <label for="hotjar">Hotjar Site ID</label>
+            <input id="hotjar" name="hotjar" placeholder="1234567" inputmode="numeric" pattern="\d{6,}" />
+          </div>
+          <p class="hint">Provided IDs are injected into every generated site automatically. Leave blank to skip.</p>
+        </div>
+      </details>
+
+      <details class="section" id="complianceSection">
+        <summary>Cannabis / Age-Gated Compliance</summary>
+        <div class="body">
+          <label class="hint" style="display:flex;align-items:center;gap:8px;">
+            <input type="checkbox" id="ageGate" style="width:auto;" />
+            <span>Force age-verification modal &amp; compliance disclaimers</span>
+          </label>
+          <div class="row-3">
+            <div class="field">
+              <label for="minAge">Min age</label>
+              <input id="minAge" name="minAge" type="number" min="18" max="25" value="21" />
+            </div>
+            <div class="field">
+              <label for="complianceState">State</label>
+              <input id="complianceState" name="complianceState" placeholder="NY" maxlength="20" />
+            </div>
+            <div class="field">
+              <label for="licenseNumber">License #</label>
+              <input id="licenseNumber" name="licenseNumber" placeholder="OCM-12345" />
+            </div>
+          </div>
+          <p class="hint">Auto-enabled when business type or description mentions cannabis / dispensary / CBD / hemp.</p>
+        </div>
+      </details>
+
       <div id="error" class="error"></div>
       <div class="actions">
-        <span class="hint">Powered by Claude · Sonnet 4.5</span>
+        <span class="hint">Generates SEO-scored production HTML</span>
         <button id="generateBtn" type="submit" class="primary">Generate Website</button>
       </div>
     </form>
   </section>
 
-  <section class="panel">
-    <div class="preview-head">
-      <div class="title">Live Preview</div>
-      <div class="controls">
+  <section class="panel reveal">
+    <div class="panel-head">
+      <span>Live Preview</span>
+      <div class="right">
+        <div class="tabs" id="variantTabs"></div>
         <button class="ctl" id="downloadBtn" type="button" disabled>Download HTML</button>
         <button class="ctl" id="openTabBtn" type="button" disabled>Open in New Tab</button>
       </div>
     </div>
-    <div class="preview-body">
-      <div class="loading" id="loading"><div class="spinner"></div>Generating your website…</div>
-      <div class="placeholder" id="placeholder">
-        <div class="pad">
-          Fill out your business details on the left and click <strong>Generate Website</strong>.
-          A live preview will appear here.
+    <div class="preview-area">
+      <div class="preview-frame">
+        <div class="loading" id="loading">
+          <div class="spinner"></div>
+          <div id="loadStatus" class="status">Generating your website…</div>
         </div>
+        <div class="placeholder" id="placeholder">
+          <div class="pad">
+            <h3>Ready to generate</h3>
+            <p>Fill out the brief, pick a theme, optionally enable A/B variants, then click <strong>Generate Website</strong>. Every site comes with an SEO score and actionable recommendations.</p>
+          </div>
+        </div>
+        <iframe id="preview" title="Generated website preview" style="display:none"></iframe>
       </div>
-      <iframe id="preview" title="Generated website preview" style="display:none"></iframe>
+
+      <aside class="seo-panel">
+        <h3>SEO &amp; Quality</h3>
+        <div class="seo-score" id="seoScore">
+          <div>
+            <div class="big" id="seoScoreNumber">—</div>
+            <div class="hint" id="seoSummary">Generate a site to see your score.</div>
+          </div>
+          <div class="meta">
+            <div class="grade" id="seoGrade">—</div>
+          </div>
+        </div>
+
+        <div class="section-title">Checks</div>
+        <div class="check-list" id="checkList">
+          <div class="check"><span class="mark">·</span><span>No site generated yet.</span></div>
+        </div>
+
+        <div class="section-title">Recommendations</div>
+        <div class="rec-list" id="recList">
+          <div class="hint">Recommendations will appear here.</div>
+        </div>
+
+        <div class="refine-panel" id="refinePanel">
+          <h4>AI Refinement</h4>
+          <p class="lead">Tweak the active variant without starting over. Pick adjustments, then Apply.</p>
+          <div class="refine-grid">
+            <div class="refine-col">
+              <h5>Tone</h5>
+              <label><input type="checkbox" data-refine="toneProfessional"/> More professional</label>
+              <label><input type="checkbox" data-refine="toneCasual"/> More casual / friendly</label>
+              <label><input type="checkbox" data-refine="toneUrgent"/> More urgent / action</label>
+              <label><input type="checkbox" data-refine="toneLuxury"/> More luxurious</label>
+            </div>
+            <div class="refine-col">
+              <h5>Copy</h5>
+              <label><input type="checkbox" data-refine="copyShorten"/> Shorten / punchier</label>
+              <label><input type="checkbox" data-refine="copyExpand"/> Expand with detail</label>
+              <label><input type="checkbox" data-refine="copyLocalSEO"/> Add local SEO depth</label>
+              <label><input type="checkbox" data-refine="copyEmphasizeOffer"/> Emphasize main offer</label>
+            </div>
+            <div class="refine-col">
+              <h5>Design</h5>
+              <label><input type="checkbox" data-refine="designBolder"/> Bolder colors</label>
+              <label><input type="checkbox" data-refine="designSofter"/> Softer / elegant</label>
+              <label><input type="checkbox" data-refine="designMoreWhitespace"/> More whitespace</label>
+              <label><input type="checkbox" data-refine="designRicher"/> Richer visuals</label>
+            </div>
+          </div>
+          <div class="refine-actions">
+            <input class="custom" id="customRefine" placeholder="Custom instruction (optional)…" maxlength="600" />
+            <button class="ctl apply" id="applyRefineBtn" type="button">Apply Refinements</button>
+          </div>
+        </div>
+      </aside>
     </div>
   </section>
 </main>
 
+<div class="attr">GENESIS Website Builder · <a href="https://github.com/Cannibusny/genesis-website-builder" target="_blank" rel="noopener">source</a></div>
+
 <script>
+  // ---- Element refs ----
   const form = document.getElementById('builderForm');
   const generateBtn = document.getElementById('generateBtn');
   const preview = document.getElementById('preview');
   const placeholder = document.getElementById('placeholder');
   const loading = document.getElementById('loading');
+  const loadStatus = document.getElementById('loadStatus');
   const errorEl = document.getElementById('error');
   const downloadBtn = document.getElementById('downloadBtn');
   const openTabBtn = document.getElementById('openTabBtn');
   const healthDot = document.getElementById('healthDot');
   const healthLabel = document.getElementById('healthLabel');
+  const swatches = document.getElementById('swatches');
+  const variantToggle = document.getElementById('variantToggle');
+  const variantTabs = document.getElementById('variantTabs');
+  const seoScoreNumber = document.getElementById('seoScoreNumber');
+  const seoGrade = document.getElementById('seoGrade');
+  const seoSummary = document.getElementById('seoSummary');
+  const checkList = document.getElementById('checkList');
+  const recList = document.getElementById('recList');
+  const businessTypeSelect = document.getElementById('businessType');
+  const complianceSection = document.getElementById('complianceSection');
+  const ageGate = document.getElementById('ageGate');
+  const description = document.getElementById('description');
+  const suggestBox = document.getElementById('suggestBox');
+  const suggestList = document.getElementById('suggestList');
+  const refinePanel = document.getElementById('refinePanel');
+  const applyRefineBtn = document.getElementById('applyRefineBtn');
+  const customRefine = document.getElementById('customRefine');
+  const exitIntent = document.getElementById('exitIntent');
+  const abHeadline = document.getElementById('abHeadline');
+  const chatbot = document.getElementById('chatbot');
+  const hotjar = document.getElementById('hotjar');
 
-  let lastHtml = '';
+  let state = {
+    variants: [],
+    activeVariant: 0,
+    selectedTheme: 'obsidian',
+    selectedCount: 1,
+    lastPayload: null,
+  };
 
+  // ---- Health check ----
   async function checkHealth() {
     try {
       const res = await fetch('/health');
       if (res.ok) {
         healthDot.classList.add('ok');
-        healthLabel.textContent = 'online';
+        const data = await res.json().catch(() => ({}));
+        healthLabel.textContent = data.version ? `online · v${data.version}` : 'online';
       } else {
         healthDot.classList.add('err');
         healthLabel.textContent = 'degraded';
@@ -307,28 +694,232 @@
   }
   checkHealth();
 
-  function showError(msg) {
-    errorEl.textContent = msg;
-    errorEl.classList.add('show');
+  // ---- Theme swatches ----
+  swatches.addEventListener('click', (e) => {
+    const swatch = e.target.closest('.swatch');
+    if (!swatch) return;
+    swatches.querySelectorAll('.swatch').forEach((s) => s.classList.remove('is-selected'));
+    swatch.classList.add('is-selected');
+    swatch.querySelector('input').checked = true;
+    state.selectedTheme = swatch.dataset.theme;
+  });
+
+  // ---- Variant toggle ----
+  variantToggle.addEventListener('click', (e) => {
+    const opt = e.target.closest('.vt');
+    if (!opt) return;
+    variantToggle.querySelectorAll('.vt').forEach((s) => s.classList.remove('is-selected'));
+    opt.classList.add('is-selected');
+    state.selectedCount = parseInt(opt.dataset.count, 10);
+  });
+
+  // ---- Auto-enable compliance for cannabis types ----
+  function refreshComplianceVisibility() {
+    const t = (businessTypeSelect.value || '').toLowerCase();
+    const isCannabis = /cannabis|dispens|cbd|hemp|smoke/.test(t);
+    if (isCannabis) {
+      complianceSection.open = true;
+      ageGate.checked = true;
+      // Also bias the theme to cannabis if user hasn't manually picked.
+      if (state.selectedTheme === 'obsidian') {
+        const cannabisSwatch = swatches.querySelector('[data-theme="cannabis"]');
+        if (cannabisSwatch) cannabisSwatch.click();
+      }
+    }
   }
-  function clearError() {
-    errorEl.textContent = '';
-    errorEl.classList.remove('show');
+  businessTypeSelect.addEventListener('change', refreshComplianceVisibility);
+
+  // ---- Error helpers ----
+  function showError(msg) { errorEl.textContent = msg; errorEl.classList.add('show'); }
+  function clearError() { errorEl.textContent = ''; errorEl.classList.remove('show'); }
+
+  // ---- SEO sidebar render ----
+  function renderSeo(seo) {
+    if (!seo) {
+      seoScoreNumber.textContent = '—';
+      seoGrade.textContent = '—';
+      seoSummary.textContent = 'Generate a site to see your score.';
+      checkList.innerHTML = '<div class="check"><span class="mark">·</span><span>No site generated yet.</span></div>';
+      recList.innerHTML = '<div class="hint">Recommendations will appear here.</div>';
+      return;
+    }
+    seoScoreNumber.textContent = seo.score;
+    seoGrade.textContent = seo.grade;
+    seoSummary.textContent = `${seo.checks.filter(c => c.passed).length}/${seo.checks.length} checks passed`;
+    checkList.innerHTML = seo.checks
+      .map(c => `<div class="check ${c.passed ? 'passed' : 'failed'}"><span class="mark">${c.passed ? '✓' : '×'}</span><span>${c.label}</span></div>`)
+      .join('');
+    recList.innerHTML = seo.recommendations.length
+      ? seo.recommendations.map(r => `<div class="rec">${r}</div>`).join('')
+      : '<div class="hint">All checks passed. No recommendations.</div>';
   }
 
+  // ---- Variant tabs ----
+  function variantLabel(v, i) {
+    if (v && v.profile && v.profile.label) return v.profile.label;
+    return String.fromCharCode(65 + i);
+  }
+  function renderVariantTabs() {
+    if (state.variants.length <= 1) {
+      variantTabs.innerHTML = '';
+      return;
+    }
+    variantTabs.innerHTML = state.variants
+      .map((v, i) => `<div class="tab ${i === state.activeVariant ? 'is-active' : ''}" data-i="${i}" title="${(v.profile && v.profile.description) ? v.profile.description.replace(/"/g,'&quot;') : ''}">${variantLabel(v, i)}<span class="score-pill">${v.seo?.score ?? '—'}</span></div>`)
+      .join('');
+  }
+  variantTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('.tab');
+    if (!tab) return;
+    state.activeVariant = parseInt(tab.dataset.i, 10);
+    activateVariant();
+  });
+
+  function activateVariant() {
+    const v = state.variants[state.activeVariant];
+    if (!v) return;
+    placeholder.style.display = 'none';
+    preview.style.display = 'block';
+    preview.srcdoc = v.html;
+    renderSeo(v.seo);
+    renderVariantTabs();
+    refinePanel.classList.add('show');
+  }
+
+  // ---- AI suggestions (debounced on description input) ----
+  let suggestTimer = null;
+  let lastSuggestKey = '';
+  description.addEventListener('input', () => {
+    clearTimeout(suggestTimer);
+    const text = description.value.trim();
+    if (text.length < 50) {
+      suggestBox.classList.remove('show');
+      return;
+    }
+    suggestTimer = setTimeout(fetchSuggestions, 1100);
+  });
+  async function fetchSuggestions() {
+    const text = description.value.trim();
+    const key = (businessTypeSelect.value || '') + '|' + text;
+    if (key === lastSuggestKey || text.length < 50) return;
+    lastSuggestKey = key;
+    suggestBox.classList.add('show', 'loading');
+    suggestList.innerHTML = '<li>Analyzing…</li>';
+    try {
+      const res = await fetch('/api/suggest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: text,
+          businessType: businessTypeSelect.value || '',
+          location: document.getElementById('location').value.trim(),
+        }),
+      });
+      if (res.status === 401) { suggestBox.classList.remove('show'); return; }
+      const data = await res.json().catch(() => ({}));
+      const items = (data.suggestions || []).slice(0, 3);
+      if (!items.length) {
+        suggestBox.classList.remove('show');
+        return;
+      }
+      suggestList.innerHTML = items.map(s => `<li>${escapeHtml(s)}</li>`).join('');
+    } catch {
+      suggestBox.classList.remove('show');
+    } finally {
+      suggestBox.classList.remove('loading');
+    }
+  }
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+  }
+
+  // ---- AI Refinement (post-generation) ----
+  applyRefineBtn.addEventListener('click', async () => {
+    const v = state.variants[state.activeVariant];
+    if (!v || !state.lastPayload) return;
+    const refinements = Array.from(refinePanel.querySelectorAll('input[type="checkbox"]:checked'))
+      .map(cb => cb.dataset.refine);
+    const customInstruction = customRefine.value.trim();
+    if (!refinements.length && !customInstruction) {
+      showError('Pick at least one refinement, or write a custom instruction.');
+      return;
+    }
+    clearError();
+    applyRefineBtn.disabled = true;
+    loading.classList.add('show');
+    loadStatus.textContent = 'Applying refinements…';
+    try {
+      const res = await fetch('/api/refine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...state.lastPayload,
+          sourceHtml: v.html,
+          refinements,
+          customInstruction,
+          variantHint: v.variantHint || null,
+        }),
+      });
+      if (res.status === 401) { window.location.replace('/'); return; }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const retry = res.headers.get('Retry-After');
+        const mins = retry ? Math.ceil(parseInt(retry, 10) / 60) : null;
+        throw new Error((data.error || 'Rate limit reached.') + (mins ? ` Try again in ~${mins} min.` : ''));
+      }
+      if (!data.success) throw new Error(data.error || 'Refinement failed');
+      state.variants[state.activeVariant] = {
+        ...v,
+        html: data.html,
+        seo: data.seo,
+      };
+      activateVariant();
+      refinePanel.querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = false; });
+      customRefine.value = '';
+    } catch (err) {
+      showError(err.message || 'Refinement failed');
+    } finally {
+      loading.classList.remove('show');
+      applyRefineBtn.disabled = false;
+    }
+  });
+
+  // ---- Submit ----
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError();
 
+    const ga4 = document.getElementById('ga4').value.trim();
+    const metaPixel = document.getElementById('metaPixel').value.trim();
+    const hotjarId = hotjar.value.trim();
+    const minAge = parseInt(document.getElementById('minAge').value, 10) || 21;
+    const complianceState = document.getElementById('complianceState').value.trim();
+    const licenseNumber = document.getElementById('licenseNumber').value.trim();
+
     const payload = {
       businessName: document.getElementById('businessName').value.trim(),
-      businessType: document.getElementById('businessType').value.trim(),
+      businessType: businessTypeSelect.value,
       location: document.getElementById('location').value.trim(),
       description: document.getElementById('description').value.trim(),
+      theme: state.selectedTheme,
+      variantCount: state.selectedCount,
+      analytics: (ga4 || metaPixel || hotjarId) ? { ga4, metaPixel, hotjar: hotjarId } : null,
+      compliance: ageGate.checked
+        ? { ageGate: true, minAge, state: complianceState, licenseNumber }
+        : null,
+      conversion: {
+        exitIntent: exitIntent.checked,
+        abHeadline: abHeadline.checked,
+        chatbot: chatbot.checked,
+      },
     };
+    state.lastPayload = payload;
 
     generateBtn.disabled = true;
     loading.classList.add('show');
+    loadStatus.textContent = state.selectedCount > 1
+      ? `Generating ${state.selectedCount} variants in parallel…`
+      : 'Generating your website…';
 
     try {
       const res = await fetch('/api/generate', {
@@ -336,15 +927,25 @@
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
-      const data = await res.json();
+      if (res.status === 401) {
+        const next = encodeURIComponent(window.location.pathname);
+        window.location.replace('/?next=' + next);
+        return;
+      }
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        const retry = res.headers.get('Retry-After');
+        const mins = retry ? Math.ceil(parseInt(retry, 10) / 60) : null;
+        throw new Error(
+          (data.error || 'Rate limit reached.') +
+            (mins ? ` Try again in ~${mins} minute${mins === 1 ? '' : 's'}.` : '')
+        );
+      }
       if (!data.success) throw new Error(data.error || 'Generation failed');
 
-      lastHtml = data.html || '';
-      if (!lastHtml) throw new Error('Empty response from model');
-
-      placeholder.style.display = 'none';
-      preview.style.display = 'block';
-      preview.srcdoc = lastHtml;
+      state.variants = data.variants && data.variants.length ? data.variants : [{ html: data.html, seo: data.seo }];
+      state.activeVariant = 0;
+      activateVariant();
 
       downloadBtn.disabled = false;
       openTabBtn.disabled = false;
@@ -356,25 +957,40 @@
     }
   });
 
+  // ---- Download ----
   downloadBtn.addEventListener('click', () => {
-    if (!lastHtml) return;
-    const blob = new Blob([lastHtml], { type: 'text/html' });
+    const v = state.variants[state.activeVariant];
+    if (!v) return;
+    const blob = new Blob([v.html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'website.html';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    const label = (v.profile && v.profile.label ? v.profile.label.toLowerCase() : String.fromCharCode(65 + state.activeVariant).toLowerCase());
+    a.download = `genesis-site-${label}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
   });
-
   openTabBtn.addEventListener('click', () => {
-    if (!lastHtml) return;
-    const blob = new Blob([lastHtml], { type: 'text/html' });
+    const v = state.variants[state.activeVariant];
+    if (!v) return;
+    const blob = new Blob([v.html], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
     window.open(url, '_blank');
   });
+
+  // ---- Scroll-triggered reveals for the builder UI itself ----
+  const io = new IntersectionObserver(
+    (entries) => entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('is-visible'); }),
+    { threshold: 0.08 }
+  );
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // ---- Service worker registration (best-effort, non-blocking) ----
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    });
+  }
 </script>
 </body>
 </html>
