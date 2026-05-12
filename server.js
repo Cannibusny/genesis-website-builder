@@ -509,51 +509,46 @@ function injectLogo(html, logo) {
   let out = html;
   const imgTag = `<img id="brand-logo" src="${src}" alt="${alt}" style="display:inline-block;height:36px;width:auto;max-width:200px;vertical-align:middle;" />`;
 
+  // NOTE: All .replace() calls below MUST use function-replacements (not string-replacements).
+  // The replacement strings include user-supplied URLs, and String.prototype.replace
+  // interprets $&, $`, $', $$, and $n inside string replacements as special patterns.
+  // Function replacements return literal strings and are immune to that interpretation.
+
   // 1. Replace placeholder <img id="brand-logo" ...> if Claude emitted one.
   const placeholderRe = /<img\b[^>]*\bid=["']brand-logo["'][^>]*\/?>/i;
   if (placeholderRe.test(out)) {
-    out = out.replace(placeholderRe, imgTag);
+    out = out.replace(placeholderRe, () => imgTag);
   } else {
     // 2. Otherwise, inject right inside the first <header ...>.
     const headerOpenRe = /(<header\b[^>]*>)/i;
     if (headerOpenRe.test(out)) {
-      out = out.replace(headerOpenRe, `$1\n  ${imgTag}`);
+      out = out.replace(headerOpenRe, (m) => `${m}\n  ${imgTag}`);
     } else {
       // 3. Last resort: prepend to <body>.
-      out = out.replace(/<body\b[^>]*>/i, match => `${match}\n${imgTag}`);
+      out = out.replace(/<body\b[^>]*>/i, (match) => `${match}\n${imgTag}`);
     }
   }
 
   // 4. Favicon: add <link rel="icon" ...> in <head> if not already present.
   if (!/<link[^>]+rel=["'](?:icon|shortcut icon)["']/i.test(out)) {
     const faviconTag = `<link rel="icon" type="${logo.mimeType || 'image/png'}" href="${src}" />`;
-    out = out.replace(/<\/head>/i, `  ${faviconTag}\n</head>`);
+    out = out.replace(/<\/head>/i, () => `  ${faviconTag}\n</head>`);
   }
 
   // 5. og:image: prefer publicUrl; data URIs are not valid for og:image.
   if (logo.publicUrl) {
+    const ogTag = `<meta property="og:image" content="${logo.publicUrl}" />`;
     if (/<meta[^>]+property=["']og:image["']/i.test(out)) {
-      out = out.replace(
-        /<meta[^>]+property=["']og:image["'][^>]*>/i,
-        `<meta property="og:image" content="${logo.publicUrl}" />`
-      );
+      out = out.replace(/<meta[^>]+property=["']og:image["'][^>]*>/i, () => ogTag);
     } else {
-      out = out.replace(
-        /<\/head>/i,
-        `  <meta property="og:image" content="${logo.publicUrl}" />\n</head>`
-      );
+      out = out.replace(/<\/head>/i, () => `  ${ogTag}\n</head>`);
     }
     // Twitter card image too.
+    const twTag = `<meta name="twitter:image" content="${logo.publicUrl}" />`;
     if (/<meta[^>]+name=["']twitter:image["']/i.test(out)) {
-      out = out.replace(
-        /<meta[^>]+name=["']twitter:image["'][^>]*>/i,
-        `<meta name="twitter:image" content="${logo.publicUrl}" />`
-      );
+      out = out.replace(/<meta[^>]+name=["']twitter:image["'][^>]*>/i, () => twTag);
     } else {
-      out = out.replace(
-        /<\/head>/i,
-        `  <meta name="twitter:image" content="${logo.publicUrl}" />\n</head>`
-      );
+      out = out.replace(/<\/head>/i, () => `  ${twTag}\n</head>`);
     }
   }
 
