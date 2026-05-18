@@ -441,7 +441,6 @@ if(localStorage.getItem('age-verified')==='true'){document.getElementById('age-g
 
   // Inject legal disclaimer in footer if not already present
   if (!/class=["']footer-disclaimer["']/i.test(out)) {
-    const stateNote = state ? ` Licensed in ${state}.` : '';
     const licenseNote = licenseNumber ? ` License #: ${licenseNumber}.` : '';
     const disclaimerHtml = `<div style="font-size:12px;color:#666;padding:20px;background:#f9f9f9;border-top:1px solid #e5e5e5;">
   <p style="margin:0 0 8px;"><strong>Legal Disclaimer:</strong> This establishment is licensed by the${state ? ' ' + state : ''} Office of Cannabis Management. Cannabis products are for adults ${minAge} years of age and older. Keep out of reach of children. Cannabis use while pregnant or breastfeeding may be harmful. Consumption of cannabis products impairs your ability to drive and operate machinery. Please use responsibly.</p>
