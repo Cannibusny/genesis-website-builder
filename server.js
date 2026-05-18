@@ -181,6 +181,16 @@ function isCannabisBusiness(businessType = '', description = '') {
   return /\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack);
 }
 
+// ----- HTML escaping helper -----
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // ----- Schema.org helpers -----
 function getSchemaType(businessType = '') {
   const typeMap = {
@@ -339,17 +349,8 @@ function buildSchemaMarkup(opts) {
     sameAs: [],
   });
 
-  // C) AggregateRating (always — placeholder for rich results)
-  schemas.push({
-    '@context': 'https://schema.org',
-    '@type': schemaType,
-    name: businessName,
-    aggregateRating: {
-      '@type': 'AggregateRating',
-      ratingValue: '4.8',
-      reviewCount: '127',
-    },
-  });
+  // NOTE: AggregateRating removed — Google penalizes sites with fabricated
+  // review markup. Only add this when real review data is available.
 
   // D) Product schema (for product-oriented businesses)
   if (hasProductContext(businessType, description)) {
@@ -401,7 +402,7 @@ function injectSchemaMarkup(html, opts) {
 
   const schemaScripts = schemas
     .map(s => `<script type="application/ld+json">
-${JSON.stringify(s, null, 2)}
+${JSON.stringify(s, null, 2).replace(/<\//g, '<\\/')}
 </script>`)
     .join('\n');
 
@@ -426,10 +427,10 @@ function injectCannabisCompliance(html, opts) {
   if (!/id=["']age-gate["']/i.test(out) && !/id=["']age.?verif/i.test(out)) {
     const ageGateHtml = `<div id="age-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;">
   <div style="background:white;padding:40px;border-radius:12px;text-align:center;max-width:500px;">
-    <h2 style="margin:0 0 12px;color:#1a1a1a;">Are you ${minAge} or older?</h2>
+    <h2 style="margin:0 0 12px;color:#1a1a1a;">Are you ${Number(minAge)} or older?</h2>
     <p style="color:#555;margin:0 0 24px;">You must be of legal age to enter this site.</p>
-    <button onclick="ageVerified()" style="background:#10b981;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">Yes, I'm ${minAge}+</button>
-    <button onclick="window.location='https://google.com'" style="background:#ef4444;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">No, I'm Under ${minAge}</button>
+    <button onclick="ageVerified()" style="background:#10b981;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">Yes, I'm ${Number(minAge)}+</button>
+    <button onclick="window.location='https://google.com'" style="background:#ef4444;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">No, I'm Under ${Number(minAge)}</button>
   </div>
 </div>
 <script>
@@ -443,8 +444,8 @@ if(localStorage.getItem('age-verified')==='true'){document.getElementById('age-g
   if (!/class=["']footer-disclaimer["']/i.test(out)) {
     const licenseNote = licenseNumber ? ` License #: ${licenseNumber}.` : '';
     const disclaimerHtml = `<div style="font-size:12px;color:#666;padding:20px;background:#f9f9f9;border-top:1px solid #e5e5e5;">
-  <p style="margin:0 0 8px;"><strong>Legal Disclaimer:</strong> This establishment is licensed by the${state ? ' ' + state : ''} Office of Cannabis Management. Cannabis products are for adults ${minAge} years of age and older. Keep out of reach of children. Cannabis use while pregnant or breastfeeding may be harmful. Consumption of cannabis products impairs your ability to drive and operate machinery. Please use responsibly.</p>
-  <p style="margin:0;"><strong>License Information:</strong> ${businessName}${licenseNote} | Location: ${location}</p>
+  <p style="margin:0 0 8px;"><strong>Legal Disclaimer:</strong> This establishment is licensed by the${state ? ' ' + escapeHtml(state) : ''} Office of Cannabis Management. Cannabis products are for adults ${Number(minAge)} years of age and older. Keep out of reach of children. Cannabis use while pregnant or breastfeeding may be harmful. Consumption of cannabis products impairs your ability to drive and operate machinery. Please use responsibly.</p>
+  <p style="margin:0;"><strong>License Information:</strong> ${escapeHtml(businessName)}${escapeHtml(licenseNote)} | Location: ${escapeHtml(location)}</p>
 </div>`;
     // Insert before </footer> if exists, otherwise before </body>
     if (/<\/footer>/i.test(out)) {
