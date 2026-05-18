@@ -181,6 +181,283 @@ function isCannabisBusiness(businessType = '', description = '') {
   return /\b(cannabis|dispensar|marijuana|hemp|cbd|thc|kratom)\b/.test(haystack);
 }
 
+// ----- HTML escaping helper -----
+function escapeHtml(str = '') {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ----- Schema.org helpers -----
+function getSchemaType(businessType = '') {
+  const typeMap = {
+    'Cannabis Dispensary': 'Store',
+    'Coffee Shop': 'CafeOrCoffeeShop',
+    'Cafe': 'CafeOrCoffeeShop',
+    'Trading Card Store': 'Store',
+    'TCG Store': 'Store',
+    'Hobby Shop': 'Store',
+    'Marketing Agency': 'ProfessionalService',
+    'Consulting': 'ProfessionalService',
+    'Restaurant': 'Restaurant',
+    'Bistro': 'Restaurant',
+    'Retail Store': 'Store',
+    'Boutique': 'Store',
+    'Service Business': 'LocalBusiness',
+    'Gym': 'HealthAndBeautyBusiness',
+    'Fitness Studio': 'HealthAndBeautyBusiness',
+    'Yoga Studio': 'HealthAndBeautyBusiness',
+    'Salon': 'HealthAndBeautyBusiness',
+    'Spa': 'HealthAndBeautyBusiness',
+    'Barber': 'HealthAndBeautyBusiness',
+    'Law Firm': 'LegalService',
+    'Attorney': 'LegalService',
+    'Real Estate': 'RealEstateAgent',
+    'SaaS': 'SoftwareApplication',
+    'Tech Startup': 'Organization',
+  };
+  for (const [key, value] of Object.entries(typeMap)) {
+    if (businessType.toLowerCase().includes(key.toLowerCase())) return value;
+  }
+  return 'LocalBusiness';
+}
+
+function parseLocation(locationString = '') {
+  const result = { street: '', city: '', state: '', zip: '' };
+  if (!locationString) return result;
+  const trimmed = locationString.trim();
+
+  // Try to extract zip code
+  const zipMatch = trimmed.match(/\b(\d{5}(?:-\d{4})?)\b/);
+  if (zipMatch) result.zip = zipMatch[1];
+
+  // Try to extract state (2-letter abbreviation or full name)
+  const stateAbbr = trimmed.match(/\b([A-Z]{2})\b(?:\s*\d{5})?/);
+  if (stateAbbr) result.state = stateAbbr[1];
+
+  // Split by commas for structured parsing
+  const parts = trimmed.split(',').map(p => p.trim());
+  if (parts.length >= 3) {
+    result.street = parts[0];
+    result.city = parts[1];
+    const stateZip = parts[2].trim();
+    const szMatch = stateZip.match(/^([A-Za-z]+(?:\s+[A-Za-z]+)*)\s*(\d{5}(?:-\d{4})?)?$/);
+    if (szMatch) {
+      result.state = szMatch[1].trim();
+      if (szMatch[2]) result.zip = szMatch[2];
+    }
+  } else if (parts.length === 2) {
+    result.street = parts[0];
+    const rest = parts[1].trim();
+    const restMatch = rest.match(/^([A-Za-z]+(?:\s+[A-Za-z]+)*)\s+([A-Z]{2})\s*(\d{5}(?:-\d{4})?)?$/);
+    if (restMatch) {
+      result.city = restMatch[1].trim();
+      result.state = restMatch[2];
+      if (restMatch[3]) result.zip = restMatch[3];
+    } else {
+      result.city = rest.replace(/\s*\d{5}(-\d{4})?\s*/, '').replace(/\s+[A-Z]{2}\s*$/, '').trim();
+    }
+  } else {
+    // Single string — try pattern: "123 Main St City ST 12345"
+    const singleMatch = trimmed.match(/^(.+?)\s+([A-Za-z]+(?:\s+[A-Za-z]+)*)\s+([A-Z]{2})\s*(\d{5}(?:-\d{4})?)?$/);
+    if (singleMatch) {
+      result.street = singleMatch[1].trim();
+      result.city = singleMatch[2].trim();
+      result.state = singleMatch[3];
+      if (singleMatch[4]) result.zip = singleMatch[4];
+    } else {
+      result.street = trimmed;
+    }
+  }
+  return result;
+}
+
+function getPriceRange(businessType = '') {
+  const haystack = businessType.toLowerCase();
+  const priceMap = [
+    [/cannabis|dispensar|marijuana/, '$$$'],
+    [/coffee|cafe|bakery/, '$$'],
+    [/trading\s*card|tcg|hobby/, '$$'],
+    [/agency|marketing|consult/, '$$$'],
+    [/restaurant|bistro|grill/, '$$'],
+    [/law|attorney|legal/, '$$$$'],
+    [/real\s*estate|realtor/, '$$$$'],
+    [/salon|spa|barber|beauty/, '$$'],
+    [/gym|fitness|yoga/, '$$'],
+    [/saas|tech|software/, '$$$'],
+  ];
+  for (const [pattern, price] of priceMap) {
+    if (pattern.test(haystack)) return price;
+  }
+  return '$$';
+}
+
+function hasProductContext(businessType = '', description = '') {
+  const haystack = `${businessType} ${description}`.toLowerCase();
+  return /\b(dispensar|cannabis|coffee|cafe|tcg|trading\s*card|hobby|retail|store|shop|boutique|product|menu|ecommerce|e-commerce)\b/.test(haystack);
+}
+
+function buildSchemaMarkup(opts) {
+  const { businessType, businessName, location, description, compliance } = opts;
+  const locationParts = parseLocation(location);
+  const schemaType = getSchemaType(businessType);
+  const priceRange = getPriceRange(businessType);
+  const schemas = [];
+
+  // A) LocalBusiness schema (always)
+  const localBusiness = {
+    '@context': 'https://schema.org',
+    '@type': schemaType,
+    name: businessName,
+    description: description.slice(0, 300),
+    address: {
+      '@type': 'PostalAddress',
+      streetAddress: locationParts.street,
+      addressLocality: locationParts.city,
+      addressRegion: locationParts.state,
+      postalCode: locationParts.zip,
+      addressCountry: 'US',
+    },
+    url: '',
+    telephone: '',
+    priceRange,
+    openingHoursSpecification: [
+      {
+        '@type': 'OpeningHoursSpecification',
+        dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'],
+        opens: '09:00',
+        closes: '20:00',
+      },
+    ],
+  };
+  if (compliance?.licenseNumber) {
+    localBusiness.identifier = compliance.licenseNumber;
+  }
+  schemas.push(localBusiness);
+
+  // B) Organization schema (always)
+  schemas.push({
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: businessName,
+    description: description.slice(0, 300),
+    url: '',
+    logo: '',
+    sameAs: [],
+  });
+
+  // NOTE: AggregateRating removed — Google penalizes sites with fabricated
+  // review markup. Only add this when real review data is available.
+
+  // D) Product schema (for product-oriented businesses)
+  if (hasProductContext(businessType, description)) {
+    schemas.push({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: `${businessName} Featured Product`,
+      description: `Premium offering from ${businessName}`,
+      offers: {
+        '@type': 'Offer',
+        priceCurrency: 'USD',
+        price: '0',
+        availability: 'https://schema.org/InStock',
+      },
+    });
+  }
+
+  return schemas;
+}
+
+function buildFaqSchema(html) {
+  const faqItems = [];
+  const detailsRe = /<details[^>]*>[\s\S]*?<summary[^>]*>([\s\S]*?)<\/summary>[\s\S]*?(?:<p[^>]*>|<div[^>]*>)?([\s\S]*?)(?:<\/p>|<\/div>)?[\s\S]*?<\/details>/gi;
+  let match;
+  while ((match = detailsRe.exec(html)) !== null) {
+    const question = match[1].replace(/<[^>]+>/g, '').trim();
+    const answer = match[2].replace(/<[^>]+>/g, '').trim();
+    if (question && answer) {
+      faqItems.push({
+        '@type': 'Question',
+        name: question,
+        acceptedAnswer: { '@type': 'Answer', text: answer },
+      });
+    }
+  }
+  if (faqItems.length === 0) return null;
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems,
+  };
+}
+
+function injectSchemaMarkup(html, opts) {
+  if (!html) return html;
+  const schemas = buildSchemaMarkup(opts);
+  const faqSchema = buildFaqSchema(html);
+  if (faqSchema) schemas.push(faqSchema);
+
+  const schemaScripts = schemas
+    .map(s => `<script type="application/ld+json">
+${JSON.stringify(s, null, 2).replace(/<\//g, '<\\/')}
+</script>`)
+    .join('\n');
+
+  // Remove any existing JSON-LD blocks that Claude generated (we replace with our richer set)
+  let out = html.replace(/<script\s+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, '');
+  out = out.replace('</head>', () => `${schemaScripts}\n</head>`);
+  return out;
+}
+
+// ----- Cannabis compliance post-processing -----
+function injectCannabisCompliance(html, opts) {
+  if (!html) return html;
+  const { businessType = '', description = '', businessName = '', location = '', compliance = {} } = opts;
+  if (!isCannabisBusiness(businessType, description) && !compliance?.ageGate) return html;
+
+  let out = html;
+  const minAge = compliance?.minAge || 21;
+  const state = compliance?.state || '';
+  const licenseNumber = compliance?.licenseNumber || '';
+
+  // Inject age verification modal if not already present
+  if (!/id=["']age-gate["']/i.test(out) && !/id=["']age.?verif/i.test(out)) {
+    const ageGateHtml = `<div id="age-gate" style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.95);z-index:9999;display:flex;align-items:center;justify-content:center;">
+  <div style="background:white;padding:40px;border-radius:12px;text-align:center;max-width:500px;">
+    <h2 style="margin:0 0 12px;color:#1a1a1a;">Are you ${Number(minAge)} or older?</h2>
+    <p style="color:#555;margin:0 0 24px;">You must be of legal age to enter this site.</p>
+    <button onclick="ageVerified()" style="background:#10b981;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">Yes, I'm ${Number(minAge)}+</button>
+    <button onclick="window.location='https://google.com'" style="background:#ef4444;color:white;padding:16px 32px;border:none;border-radius:8px;font-size:18px;margin:10px;cursor:pointer;">No, I'm Under ${Number(minAge)}</button>
+  </div>
+</div>
+<script>
+function ageVerified(){localStorage.setItem('age-verified','true');document.getElementById('age-gate').style.display='none';}
+if(localStorage.getItem('age-verified')==='true'){document.getElementById('age-gate').style.display='none';}
+</script>`;
+    out = out.replace(/<body\b[^>]*>/i, (m) => `${m}\n${ageGateHtml}`);
+  }
+
+  // Inject legal disclaimer in footer if not already present
+  if (!/class=["']footer-disclaimer["']/i.test(out)) {
+    const licenseNote = licenseNumber ? ` License #: ${licenseNumber}.` : '';
+    const disclaimerHtml = `<div style="font-size:12px;color:#666;padding:20px;background:#f9f9f9;border-top:1px solid #e5e5e5;">
+  <p style="margin:0 0 8px;"><strong>Legal Disclaimer:</strong> This establishment is licensed by the${state ? ' ' + escapeHtml(state) : ''} Office of Cannabis Management. Cannabis products are for adults ${Number(minAge)} years of age and older. Keep out of reach of children. Cannabis use while pregnant or breastfeeding may be harmful. Consumption of cannabis products impairs your ability to drive and operate machinery. Please use responsibly.</p>
+  <p style="margin:0;"><strong>License Information:</strong> ${escapeHtml(businessName)}${escapeHtml(licenseNote)} | Location: ${escapeHtml(location)}</p>
+</div>`;
+    // Insert before </footer> if exists, otherwise before </body>
+    if (/<\/footer>/i.test(out)) {
+      out = out.replace(/<\/footer>/i, () => `${disclaimerHtml}\n</footer>`);
+    } else {
+      out = out.replace(/<\/body>/i, () => `${disclaimerHtml}\n</body>`);
+    }
+  }
+
+  return out;
+}
+
 // ----- Per-industry design rules (injected into system prompt for sharper, on-brand output) -----
 function getIndustryRules(businessType = '', description = '') {
   const haystack = `${businessType} ${description}`.toLowerCase();
@@ -778,6 +1055,8 @@ Build the entire single-file HTML now.`;
   let html = stripCodeFences(textBlock ? textBlock.text : '');
   html = injectLogo(html, logo);
   html = injectAnalytics(html, analytics);
+  html = injectSchemaMarkup(html, { businessType, businessName, location, description, compliance });
+  html = injectCannabisCompliance(html, { businessType, description, businessName, location, compliance });
   const seo = scoreSeo(html);
 
   return { html, seo, variantHint: variantHint || null };
