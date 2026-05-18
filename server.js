@@ -408,7 +408,7 @@ ${JSON.stringify(s, null, 2).replace(/<\//g, '<\\/')}
 
   // Remove any existing JSON-LD blocks that Claude generated (we replace with our richer set)
   let out = html.replace(/<script\s+type=["']application\/ld\+json["'][^>]*>[\s\S]*?<\/script>/gi, '');
-  out = out.replace('</head>', `${schemaScripts}\n</head>`);
+  out = out.replace('</head>', () => `${schemaScripts}\n</head>`);
   return out;
 }
 
